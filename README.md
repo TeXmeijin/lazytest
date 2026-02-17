@@ -4,6 +4,8 @@ A TUI test runner for **monorepos**, built with Go and [Bubble Tea](https://gith
 
 LazyTest parses [TeamCity format](https://www.jetbrains.com/help/teamcity/service-messages.html#Reporting+Tests) output in real time and displays results interactively in your terminal. Run PHPUnit, Vitest, Jest, pytest and more — side by side from a single TUI.
 
+![LazyTest Demo](demo.gif)
+
 ## Features
 
 - **Multi-framework support** - Run PHPUnit, Vitest, and other frameworks in a single session
