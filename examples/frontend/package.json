@@ -1,0 +1,7 @@
+{
+  "private": true,
+  "devDependencies": {
+    "vitest": "^3.0.0",
+    "vitest-teamcity-reporter": "^0.3.0"
+  }
+}

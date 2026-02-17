@@ -1,0 +1,14 @@
+editor: code
+targets:
+  - name: phpunit
+    command: "./backend/vendor/bin/phpunit --teamcity {files}"
+    test_dirs:
+      - backend/tests/
+    file_pattern: "*Test.php"
+
+  - name: vitest
+    command: "npx vitest run --reporter=vitest-teamcity-reporter {files}"
+    test_dirs:
+      - frontend/src/
+    file_pattern: "*.test.ts"
+    working_dir: "frontend/"

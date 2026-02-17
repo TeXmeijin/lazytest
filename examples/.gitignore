@@ -1,0 +1,4 @@
+backend/vendor/
+frontend/node_modules/
+frontend/package-lock.json
+backend/composer.lock
