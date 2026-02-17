@@ -1,10 +1,6 @@
 package config
 
-import (
-	"encoding/xml"
-	"os"
-	"path/filepath"
-)
+import "encoding/xml"
 
 type phpunitXML struct {
 	XMLName    xml.Name        `xml:"phpunit"`
@@ -20,35 +16,11 @@ type phpunitSuiteXML struct {
 	Directories []string `xml:"directory"`
 }
 
-// DetectPHPUnit looks for phpunit.xml or phpunit.xml.dist in the given directory
-// and extracts test directories from it.
-func DetectPHPUnit(dir string) (Config, error) {
-	candidates := []string{
-		filepath.Join(dir, "phpunit.xml"),
-		filepath.Join(dir, "phpunit.xml.dist"),
-	}
-
-	var data []byte
-	var err error
-	for _, path := range candidates {
-		data, err = os.ReadFile(path)
-		if err == nil {
-			break
-		}
-	}
-	if err != nil {
-		// No phpunit.xml found, return defaults
-		cfg := Config{}
-		cfg.applyDefaults()
-		return cfg, nil
-	}
-
+// parsePHPUnitDirs extracts test directory paths from phpunit.xml content.
+func parsePHPUnitDirs(data []byte) []string {
 	var parsed phpunitXML
 	if err := xml.Unmarshal(data, &parsed); err != nil {
-		// XML parse error, return defaults
-		cfg := Config{}
-		cfg.applyDefaults()
-		return cfg, nil
+		return nil
 	}
 
 	var dirs []string
@@ -63,10 +35,5 @@ func DetectPHPUnit(dir string) (Config, error) {
 			}
 		}
 	}
-
-	cfg := Config{
-		TestDirs: dirs,
-	}
-	cfg.applyDefaults()
-	return cfg, nil
+	return dirs
 }

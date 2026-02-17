@@ -4,6 +4,8 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/meijin/lazytest/internal/config"
 )
 
 func TestScanFindsMatchingFiles(t *testing.T) {
@@ -96,5 +98,78 @@ func TestScanResultsSorted(t *testing.T) {
 			t.Errorf("not sorted: %v", files)
 			break
 		}
+	}
+}
+
+func TestScanCommaPattern(t *testing.T) {
+	dir := t.TempDir()
+	os.WriteFile(filepath.Join(dir, "app.test.ts"), []byte(""), 0644)
+	os.WriteFile(filepath.Join(dir, "page.test.tsx"), []byte(""), 0644)
+	os.WriteFile(filepath.Join(dir, "util.ts"), []byte(""), 0644)
+
+	files, err := ScanFiles([]string{dir}, "*.test.ts,*.test.tsx")
+	if err != nil {
+		t.Fatalf("ScanFiles error: %v", err)
+	}
+	if len(files) != 2 {
+		t.Fatalf("got %d files, want 2: %v", len(files), files)
+	}
+}
+
+func TestScanAllTargets(t *testing.T) {
+	dir := t.TempDir()
+
+	// PHP tests
+	phpDir := filepath.Join(dir, "server", "tests")
+	os.MkdirAll(phpDir, 0755)
+	os.WriteFile(filepath.Join(phpDir, "UserTest.php"), []byte(""), 0644)
+
+	// Vitest tests
+	vtDir := filepath.Join(dir, "client", "src")
+	os.MkdirAll(vtDir, 0755)
+	os.WriteFile(filepath.Join(vtDir, "App.test.ts"), []byte(""), 0644)
+	os.WriteFile(filepath.Join(vtDir, "Page.test.tsx"), []byte(""), 0644)
+
+	targets := []config.Target{
+		{
+			Name:        "phpunit",
+			TestDirs:    []string{phpDir},
+			FilePattern: "*Test.php",
+		},
+		{
+			Name:        "vitest",
+			TestDirs:    []string{vtDir},
+			FilePattern: "*.test.ts,*.test.tsx",
+		},
+	}
+
+	files, err := ScanAllTargets(targets)
+	if err != nil {
+		t.Fatalf("ScanAllTargets error: %v", err)
+	}
+
+	if len(files) != 3 {
+		t.Fatalf("got %d files, want 3: %v", len(files), files)
+	}
+
+	// Should be sorted: phpunit first (alphabetically), then vitest
+	if files[0].TargetName != "phpunit" {
+		t.Errorf("files[0].TargetName = %q, want phpunit", files[0].TargetName)
+	}
+	if files[1].TargetName != "vitest" {
+		t.Errorf("files[1].TargetName = %q, want vitest", files[1].TargetName)
+	}
+	if files[2].TargetName != "vitest" {
+		t.Errorf("files[2].TargetName = %q, want vitest", files[2].TargetName)
+	}
+}
+
+func TestScanAllTargetsEmpty(t *testing.T) {
+	files, err := ScanAllTargets(nil)
+	if err != nil {
+		t.Fatalf("ScanAllTargets error: %v", err)
+	}
+	if len(files) != 0 {
+		t.Errorf("got %d files, want 0", len(files))
 	}
 }

@@ -13,6 +13,10 @@ var (
 	colorBg        = lipgloss.Color("#1E1E2E") // dark bg
 	colorBorder    = lipgloss.Color("#4B5563") // border gray
 
+	// Target badge colors
+	colorPHPUnit = lipgloss.Color("#4F5B93") // blue-ish (PHP)
+	colorVitest  = lipgloss.Color("#729B1B") // green-ish (Vitest)
+
 	// Box styles
 	boxStyle = lipgloss.NewStyle().
 			Border(lipgloss.RoundedBorder()).
@@ -83,6 +87,19 @@ var (
 	// Duration
 	durationStyle = lipgloss.NewStyle().
 			Foreground(colorMuted)
+
+	// Target badge styles
+	phpunitBadgeStyle = lipgloss.NewStyle().
+				Foreground(lipgloss.Color("#FFFFFF")).
+				Background(colorPHPUnit).
+				Bold(true).
+				Padding(0, 1)
+
+	vitestBadgeStyle = lipgloss.NewStyle().
+				Foreground(lipgloss.Color("#FFFFFF")).
+				Background(colorVitest).
+				Bold(true).
+				Padding(0, 1)
 )
 
 func statusStyle(icon string) lipgloss.Style {
@@ -99,5 +116,22 @@ func statusStyle(icon string) lipgloss.Style {
 		return skippedStyle
 	default:
 		return pendingStyle
+	}
+}
+
+// targetBadge returns a styled badge string for the given target name.
+func targetBadge(name string) string {
+	switch name {
+	case "phpunit":
+		return phpunitBadgeStyle.Render("PHP")
+	case "vitest":
+		return vitestBadgeStyle.Render("VT")
+	default:
+		return lipgloss.NewStyle().
+			Foreground(lipgloss.Color("#FFFFFF")).
+			Background(colorMuted).
+			Bold(true).
+			Padding(0, 1).
+			Render(name)
 	}
 }

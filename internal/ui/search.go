@@ -55,20 +55,18 @@ func (m *SearchModel) ClearInput() {
 	m.applyFilter()
 }
 
-func (m *SearchModel) FilteredFiles() []string {
-	paths := make([]string, len(m.filtered))
-	for i, f := range m.filtered {
-		paths[i] = f.Path
-	}
-	return paths
+// FilteredFiles returns the currently filtered files as TestFile slice.
+func (m *SearchModel) FilteredFiles() []domain.TestFile {
+	result := make([]domain.TestFile, len(m.filtered))
+	copy(result, m.filtered)
+	return result
 }
 
-func (m *SearchModel) AllFiles() []string {
-	paths := make([]string, len(m.allFiles))
-	for i, f := range m.allFiles {
-		paths[i] = f.Path
-	}
-	return paths
+// AllFiles returns all files as TestFile slice.
+func (m *SearchModel) AllFiles() []domain.TestFile {
+	result := make([]domain.TestFile, len(m.allFiles))
+	copy(result, m.allFiles)
+	return result
 }
 
 func (m SearchModel) Update(msg tea.Msg) (SearchModel, tea.Cmd) {
@@ -168,7 +166,10 @@ func (m SearchModel) View(width, height int) string {
 			statusIcon = pendingStyle.Render("○")
 		}
 
-		line := fmt.Sprintf("%s%s", prefix, style.Render(f.Path))
+		// Target badge
+		badge := targetBadge(f.TargetName)
+
+		line := fmt.Sprintf("%s%s %s", prefix, badge, style.Render(f.Path))
 		pad := width - lipgloss.Width(line) - lipgloss.Width(statusIcon) - 2
 		if pad < 1 {
 			pad = 1

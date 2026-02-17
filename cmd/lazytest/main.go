@@ -8,7 +8,6 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/meijin/lazytest/internal/config"
 	"github.com/meijin/lazytest/internal/discovery"
-	"github.com/meijin/lazytest/internal/domain"
 	"github.com/meijin/lazytest/internal/ui"
 )
 
@@ -22,20 +21,15 @@ func main() {
 		os.Exit(1)
 	}
 
-	paths, err := discovery.ScanFiles(cfg.TestDirs, cfg.FilePattern)
+	files, err := discovery.ScanAllTargets(cfg.Targets)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error scanning test files: %v\n", err)
 		os.Exit(1)
 	}
 
-	if len(paths) == 0 {
-		fmt.Fprintf(os.Stderr, "No test files found in %v matching %q\n", cfg.TestDirs, cfg.FilePattern)
+	if len(files) == 0 {
+		fmt.Fprintf(os.Stderr, "No test files found for configured targets\n")
 		os.Exit(1)
-	}
-
-	files := make([]domain.TestFile, len(paths))
-	for i, p := range paths {
-		files[i] = domain.TestFile{Path: p}
 	}
 
 	app := ui.NewApp(cfg, files)

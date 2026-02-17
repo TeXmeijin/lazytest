@@ -6,15 +6,24 @@ import (
 	"testing"
 )
 
-func TestLoadValidYAML(t *testing.T) {
+func TestLoadMultiTargetYAML(t *testing.T) {
 	dir := t.TempDir()
 
-	yamlContent := `command: "docker compose exec php-fpm php artisan test --teamcity {files}"
-test_dirs:
-  - src/tests/Feature
-  - src/tests/Unit
-file_pattern: "*Test.php"
-path_strip_prefix: "src/"
+	yamlContent := `editor: zed
+targets:
+  - name: phpunit
+    command: "docker compose exec app php artisan test --teamcity {files}"
+    test_dirs:
+      - backend/src/tests/
+    file_pattern: "*Test.php"
+    path_strip_prefix: "backend/src/"
+  - name: vitest
+    command: "npx vitest run --reporter=teamcity {files}"
+    test_dirs:
+      - frontend/next/src/
+      - frontend/next/app/
+    file_pattern: "*.test.ts,*.test.tsx"
+    working_dir: "frontend/next/"
 `
 	configPath := filepath.Join(dir, ConfigFileName)
 	if err := os.WriteFile(configPath, []byte(yamlContent), 0644); err != nil {
@@ -26,27 +35,48 @@ path_strip_prefix: "src/"
 		t.Fatalf("Load returned error: %v", err)
 	}
 
-	if cfg.Command != `docker compose exec php-fpm php artisan test --teamcity {files}` {
-		t.Errorf("Command = %q", cfg.Command)
+	if cfg.Editor != "zed" {
+		t.Errorf("Editor = %q, want zed", cfg.Editor)
 	}
-	if len(cfg.TestDirs) != 2 {
-		t.Fatalf("TestDirs length = %d, want 2", len(cfg.TestDirs))
+	if len(cfg.Targets) != 2 {
+		t.Fatalf("Targets length = %d, want 2", len(cfg.Targets))
 	}
-	if cfg.TestDirs[0] != "src/tests/Feature" {
-		t.Errorf("TestDirs[0] = %q", cfg.TestDirs[0])
+
+	php := cfg.Targets[0]
+	if php.Name != "phpunit" {
+		t.Errorf("Targets[0].Name = %q", php.Name)
 	}
-	if cfg.FilePattern != "*Test.php" {
-		t.Errorf("FilePattern = %q", cfg.FilePattern)
+	if php.Command != `docker compose exec app php artisan test --teamcity {files}` {
+		t.Errorf("Targets[0].Command = %q", php.Command)
 	}
-	if cfg.PathStripPrefix != "src/" {
-		t.Errorf("PathStripPrefix = %q", cfg.PathStripPrefix)
+	if len(php.TestDirs) != 1 || php.TestDirs[0] != "backend/src/tests/" {
+		t.Errorf("Targets[0].TestDirs = %v", php.TestDirs)
+	}
+	if php.FilePattern != "*Test.php" {
+		t.Errorf("Targets[0].FilePattern = %q", php.FilePattern)
+	}
+	if php.PathStripPrefix != "backend/src/" {
+		t.Errorf("Targets[0].PathStripPrefix = %q", php.PathStripPrefix)
+	}
+
+	vt := cfg.Targets[1]
+	if vt.Name != "vitest" {
+		t.Errorf("Targets[1].Name = %q", vt.Name)
+	}
+	if vt.FilePattern != "*.test.ts,*.test.tsx" {
+		t.Errorf("Targets[1].FilePattern = %q", vt.FilePattern)
+	}
+	if vt.WorkingDir != "frontend/next/" {
+		t.Errorf("Targets[1].WorkingDir = %q", vt.WorkingDir)
 	}
 }
 
-func TestLoadDefaults(t *testing.T) {
+func TestLoadSingleTargetDefaults(t *testing.T) {
 	dir := t.TempDir()
 
-	yamlContent := `command: "phpunit --teamcity {files}"
+	yamlContent := `targets:
+  - name: phpunit
+    command: "phpunit --teamcity {files}"
 `
 	configPath := filepath.Join(dir, ConfigFileName)
 	if err := os.WriteFile(configPath, []byte(yamlContent), 0644); err != nil {
@@ -58,15 +88,52 @@ func TestLoadDefaults(t *testing.T) {
 		t.Fatalf("Load returned error: %v", err)
 	}
 
-	if cfg.FilePattern != "*Test.php" {
-		t.Errorf("FilePattern default = %q, want *Test.php", cfg.FilePattern)
+	if len(cfg.Targets) != 1 {
+		t.Fatalf("Targets length = %d, want 1", len(cfg.Targets))
 	}
-	if len(cfg.TestDirs) != 1 || cfg.TestDirs[0] != "tests/" {
-		t.Errorf("TestDirs default = %v, want [tests/]", cfg.TestDirs)
+
+	php := cfg.Targets[0]
+	if php.FilePattern != "*Test.php" {
+		t.Errorf("FilePattern default = %q, want *Test.php", php.FilePattern)
+	}
+	if len(php.TestDirs) != 1 || php.TestDirs[0] != "tests/" {
+		t.Errorf("TestDirs default = %v, want [tests/]", php.TestDirs)
 	}
 }
 
-func TestLoadMissingFileFallsBackToPHPUnit(t *testing.T) {
+func TestLoadVitestDefaults(t *testing.T) {
+	dir := t.TempDir()
+
+	yamlContent := `targets:
+  - name: vitest
+`
+	configPath := filepath.Join(dir, ConfigFileName)
+	if err := os.WriteFile(configPath, []byte(yamlContent), 0644); err != nil {
+		t.Fatalf("writing config: %v", err)
+	}
+
+	cfg, err := Load(configPath)
+	if err != nil {
+		t.Fatalf("Load returned error: %v", err)
+	}
+
+	if len(cfg.Targets) != 1 {
+		t.Fatalf("Targets length = %d, want 1", len(cfg.Targets))
+	}
+
+	vt := cfg.Targets[0]
+	if vt.FilePattern != "*.test.ts,*.test.tsx" {
+		t.Errorf("FilePattern default = %q, want *.test.ts,*.test.tsx", vt.FilePattern)
+	}
+	if vt.Command != "npx vitest run --reporter=teamcity {files}" {
+		t.Errorf("Command default = %q", vt.Command)
+	}
+	if len(vt.TestDirs) != 1 || vt.TestDirs[0] != "src/" {
+		t.Errorf("TestDirs default = %v, want [src/]", vt.TestDirs)
+	}
+}
+
+func TestLoadMissingFileFallsBackToDetection(t *testing.T) {
 	dir := t.TempDir()
 
 	// Create a phpunit.xml
@@ -98,79 +165,63 @@ func TestLoadMissingFileFallsBackToPHPUnit(t *testing.T) {
 		t.Fatalf("Load returned error: %v", err)
 	}
 
-	if len(cfg.TestDirs) != 2 {
-		t.Fatalf("TestDirs length = %d, want 2", len(cfg.TestDirs))
-	}
-	if cfg.TestDirs[0] != "tests/Feature/" {
-		t.Errorf("TestDirs[0] = %q, want tests/Feature/", cfg.TestDirs[0])
-	}
-	if cfg.Command != "./vendor/bin/phpunit --teamcity {files}" {
-		t.Errorf("Command = %q", cfg.Command)
-	}
-}
-
-func TestDetectPHPUnit(t *testing.T) {
-	dir := t.TempDir()
-
-	phpunitContent := `<?xml version="1.0" encoding="UTF-8"?>
-<phpunit>
-  <testsuites>
-    <testsuite name="Tests">
-      <directory>tests</directory>
-    </testsuite>
-  </testsuites>
-</phpunit>
-`
-	if err := os.WriteFile(filepath.Join(dir, "phpunit.xml"), []byte(phpunitContent), 0644); err != nil {
-		t.Fatalf("writing phpunit.xml: %v", err)
+	if len(cfg.Targets) < 1 {
+		t.Fatal("expected at least 1 target from auto-detection")
 	}
 
-	cfg, err := DetectPHPUnit(dir)
-	if err != nil {
-		t.Fatalf("DetectPHPUnit returned error: %v", err)
+	php := cfg.Targets[0]
+	if php.Name != "phpunit" {
+		t.Errorf("Target name = %q, want phpunit", php.Name)
 	}
-
-	if len(cfg.TestDirs) != 1 || cfg.TestDirs[0] != "tests/" {
-		t.Errorf("TestDirs = %v, want [tests/]", cfg.TestDirs)
+	if len(php.TestDirs) != 2 {
+		t.Fatalf("TestDirs length = %d, want 2", len(php.TestDirs))
+	}
+	if php.TestDirs[0] != "tests/Feature/" {
+		t.Errorf("TestDirs[0] = %q, want tests/Feature/", php.TestDirs[0])
 	}
 }
 
-func TestDetectPHPUnitDist(t *testing.T) {
-	dir := t.TempDir()
+func TestTargetApplyDefaultsPHPUnit(t *testing.T) {
+	target := Target{Name: "phpunit"}
+	target.applyDefaults()
 
-	phpunitContent := `<?xml version="1.0" encoding="UTF-8"?>
-<phpunit>
-  <testsuites>
-    <testsuite name="Feature">
-      <directory>tests/Feature</directory>
-    </testsuite>
-  </testsuites>
-</phpunit>
-`
-	if err := os.WriteFile(filepath.Join(dir, "phpunit.xml.dist"), []byte(phpunitContent), 0644); err != nil {
-		t.Fatalf("writing phpunit.xml.dist: %v", err)
+	if target.FilePattern != "*Test.php" {
+		t.Errorf("FilePattern = %q", target.FilePattern)
 	}
-
-	cfg, err := DetectPHPUnit(dir)
-	if err != nil {
-		t.Fatalf("DetectPHPUnit returned error: %v", err)
+	if target.Command != "./vendor/bin/phpunit --teamcity {files}" {
+		t.Errorf("Command = %q", target.Command)
 	}
-
-	if len(cfg.TestDirs) != 1 {
-		t.Fatalf("TestDirs length = %d, want 1", len(cfg.TestDirs))
+	if len(target.TestDirs) != 1 || target.TestDirs[0] != "tests/" {
+		t.Errorf("TestDirs = %v", target.TestDirs)
 	}
 }
 
-func TestDetectPHPUnitNotFound(t *testing.T) {
-	dir := t.TempDir()
+func TestTargetApplyDefaultsVitest(t *testing.T) {
+	target := Target{Name: "vitest"}
+	target.applyDefaults()
 
-	cfg, err := DetectPHPUnit(dir)
-	if err != nil {
-		t.Fatalf("DetectPHPUnit returned error: %v", err)
+	if target.FilePattern != "*.test.ts,*.test.tsx" {
+		t.Errorf("FilePattern = %q", target.FilePattern)
 	}
+	if target.Command != "npx vitest run --reporter=teamcity {files}" {
+		t.Errorf("Command = %q", target.Command)
+	}
+	if len(target.TestDirs) != 1 || target.TestDirs[0] != "src/" {
+		t.Errorf("TestDirs = %v", target.TestDirs)
+	}
+}
 
-	// Should return defaults
-	if cfg.FilePattern != "*Test.php" {
-		t.Errorf("FilePattern = %q", cfg.FilePattern)
+func TestFindProjectRootVitest(t *testing.T) {
+	dir := t.TempDir()
+	sub := filepath.Join(dir, "packages", "app")
+	os.MkdirAll(sub, 0755)
+	os.WriteFile(filepath.Join(dir, "vitest.config.ts"), []byte(""), 0644)
+
+	root, err := FindProjectRoot(sub)
+	if err != nil {
+		t.Fatalf("FindProjectRoot error: %v", err)
+	}
+	if root != dir {
+		t.Errorf("root = %q, want %q", root, dir)
 	}
 }

@@ -7,7 +7,7 @@ import (
 	"github.com/meijin/lazytest/internal/domain"
 )
 
-func renderStatusBar(run *domain.TestRun, width int) string {
+func renderStatusBar(run *domain.AggregatedRun, width int) string {
 	if run == nil {
 		return statusBarStyle.Width(width).Render("No test results yet")
 	}

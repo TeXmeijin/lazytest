@@ -9,18 +9,25 @@ import (
 
 const ConfigFileName = ".lazytest.yml"
 
-// Config represents the lazytest configuration.
-type Config struct {
+// Target represents a single test framework target in a monorepo.
+type Target struct {
+	Name            string   `yaml:"name"`
 	Command         string   `yaml:"command"`
 	TestDirs        []string `yaml:"test_dirs"`
 	FilePattern     string   `yaml:"file_pattern"`
 	PathStripPrefix string   `yaml:"path_strip_prefix"`
-	Editor          string   `yaml:"editor"`
+	WorkingDir      string   `yaml:"working_dir"`
+}
+
+// Config represents the lazytest configuration.
+type Config struct {
+	Targets []Target `yaml:"targets"`
+	Editor  string   `yaml:"editor"`
 }
 
 // Load reads configuration from the given path or auto-detects.
 // If configPath is empty, it looks for .lazytest.yml in the current directory.
-// If .lazytest.yml is not found, it falls back to phpunit.xml detection.
+// If .lazytest.yml is not found, it falls back to framework auto-detection.
 func Load(configPath string) (Config, error) {
 	if configPath == "" {
 		configPath = ConfigFileName
@@ -29,8 +36,14 @@ func Load(configPath string) (Config, error) {
 	data, err := os.ReadFile(configPath)
 	if err != nil {
 		if os.IsNotExist(err) {
-			// Fall back to phpunit.xml detection
-			return DetectPHPUnit(".")
+			// Fall back to framework auto-detection
+			targets, detectErr := DetectFrameworks(".")
+			if detectErr != nil {
+				return Config{}, detectErr
+			}
+			cfg := Config{Targets: targets}
+			cfg.applyDefaults()
+			return cfg, nil
 		}
 		return Config{}, err
 	}
@@ -40,25 +53,46 @@ func Load(configPath string) (Config, error) {
 		return Config{}, err
 	}
 
+	for i := range cfg.Targets {
+		cfg.Targets[i].applyDefaults()
+	}
 	cfg.applyDefaults()
 	return cfg, nil
 }
 
+// applyDefaults fills in missing Config-level fields.
 func (c *Config) applyDefaults() {
-	if c.FilePattern == "" {
-		c.FilePattern = "*Test.php"
-	}
-	if c.Command == "" {
-		c.Command = "./vendor/bin/phpunit --teamcity {files}"
-	}
-	if len(c.TestDirs) == 0 {
-		c.TestDirs = []string{"tests/"}
-	}
 	if c.Editor == "" {
 		if editor := os.Getenv("LAZYTEST_EDITOR"); editor != "" {
 			c.Editor = editor
 		} else {
 			c.Editor = "zed"
+		}
+	}
+}
+
+// applyDefaults fills in missing Target fields based on the target name.
+func (t *Target) applyDefaults() {
+	switch t.Name {
+	case "vitest":
+		if t.FilePattern == "" {
+			t.FilePattern = "*.test.ts,*.test.tsx"
+		}
+		if t.Command == "" {
+			t.Command = "npx vitest run --reporter=teamcity {files}"
+		}
+		if len(t.TestDirs) == 0 {
+			t.TestDirs = []string{"src/"}
+		}
+	default: // phpunit and others
+		if t.FilePattern == "" {
+			t.FilePattern = "*Test.php"
+		}
+		if t.Command == "" {
+			t.Command = "./vendor/bin/phpunit --teamcity {files}"
+		}
+		if len(t.TestDirs) == 0 {
+			t.TestDirs = []string{"tests/"}
 		}
 	}
 }
@@ -81,6 +115,12 @@ func FindProjectRoot(dir string) (string, error) {
 		}
 		if _, err := os.Stat(filepath.Join(dir, "phpunit.xml.dist")); err == nil {
 			return dir, nil
+		}
+		// Check for vitest config files
+		for _, name := range []string{"vitest.config.ts", "vitest.config.mts", "vitest.config.js"} {
+			if _, err := os.Stat(filepath.Join(dir, name)); err == nil {
+				return dir, nil
+			}
 		}
 
 		parent := filepath.Dir(dir)

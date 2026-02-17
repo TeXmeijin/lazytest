@@ -152,11 +152,17 @@ func parseAttributes(s string) map[string]string {
 }
 
 func parseDuration(s string) time.Duration {
+	// Try integer first (PHPUnit outputs integer milliseconds)
 	ms, err := strconv.ParseInt(s, 10, 64)
-	if err != nil {
-		return 0
+	if err == nil {
+		return time.Duration(ms) * time.Millisecond
 	}
-	return time.Duration(ms) * time.Millisecond
+	// Try float (Vitest outputs fractional milliseconds)
+	fms, err := strconv.ParseFloat(s, 64)
+	if err == nil {
+		return time.Duration(fms * float64(time.Millisecond))
+	}
+	return 0
 }
 
 // ParseStream reads from an io.Reader line by line and sends Events to the channel.

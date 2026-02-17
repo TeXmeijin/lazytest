@@ -68,17 +68,46 @@ type TestSuite struct {
 // TestFile represents a test file with its previous run status.
 type TestFile struct {
 	Path       string     // relative path
+	TargetName string     // which target this file belongs to
 	PrevStatus TestStatus // status from previous run
 }
 
-// TestRun represents the results of a single test execution.
+// TestRun represents the results of a single test execution (one target).
 type TestRun struct {
-	Suites   []*TestSuite
+	TargetName string
+	Suites     []*TestSuite
+	Passed     int
+	Failed     int
+	Skipped    int
+	Duration   time.Duration
+	Files      []string // files that were tested
+}
+
+// AggregatedRun holds results from multiple target runs.
+type AggregatedRun struct {
+	Runs     []*TestRun
 	Passed   int
 	Failed   int
 	Skipped  int
 	Duration time.Duration
-	Files    []string // files that were tested
+}
+
+// AddRun appends a TestRun and updates aggregate counters.
+func (a *AggregatedRun) AddRun(run *TestRun) {
+	a.Runs = append(a.Runs, run)
+	a.Passed += run.Passed
+	a.Failed += run.Failed
+	a.Skipped += run.Skipped
+	a.Duration += run.Duration
+}
+
+// AllSuites returns all suites from all runs.
+func (a *AggregatedRun) AllSuites() []*TestSuite {
+	var suites []*TestSuite
+	for _, r := range a.Runs {
+		suites = append(suites, r.Suites...)
+	}
+	return suites
 }
 
 // SuiteStatus computes the aggregate status for a suite.

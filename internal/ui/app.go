@@ -3,6 +3,7 @@ package ui
 import (
 	"context"
 	"os/exec"
+	"path/filepath"
 	"strings"
 
 	"github.com/charmbracelet/bubbles/key"
@@ -10,7 +11,6 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	"github.com/meijin/lazytest/internal/config"
 	"github.com/meijin/lazytest/internal/domain"
-	"github.com/meijin/lazytest/internal/parser"
 	"github.com/meijin/lazytest/internal/runner"
 )
 
@@ -25,12 +25,10 @@ const (
 
 // Messages
 
-// testEventMsg carries a single streaming event from a test run.
-// runID ties it to a specific execution so stale events from cancelled runs are ignored.
 type testEventMsg struct {
 	runID  uint64
-	event  *parser.Event
-	events <-chan *parser.Event
+	event  *runner.TargetEvent
+	events <-chan *runner.TargetEvent
 	errs   <-chan error
 }
 
@@ -46,9 +44,10 @@ type App struct {
 	running   RunningModel
 	results   ResultsModel
 	executor  *runner.Executor
+	config    config.Config
 	editor    string
-	lastRun   *domain.TestRun
-	lastFiles []string
+	lastRun   *domain.AggregatedRun
+	lastFiles []domain.TestFile
 	cancel    context.CancelFunc
 	runID     uint64 // incremented on each new test execution
 	width     int
@@ -63,6 +62,7 @@ func NewApp(cfg config.Config, files []domain.TestFile) App {
 		running:  NewRunningModel(),
 		results:  NewResultsModel(),
 		executor: runner.NewExecutor(cfg),
+		config:   cfg,
 		editor:   cfg.Editor,
 	}
 }
@@ -81,11 +81,20 @@ func (a App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case testEventMsg:
 		// Ignore events from a cancelled/old run
 		if msg.runID != a.runID {
-			// Drain the channel in background to avoid goroutine leak
 			return a, drainEvents(msg.events, msg.errs)
 		}
-		if a.mode == ModeRunning {
+		if msg.event != nil && a.mode == ModeRunning {
 			a.running.HandleEvent(msg.event)
+
+			// Check if all targets are done
+			if a.running.AllDone() {
+				run := a.running.BuildAggregatedRun(a.lastFiles)
+				a.lastRun = run
+				a.results.SetRun(run)
+				a.updateFileStatuses(run)
+				a.mode = ModeResults
+				return a, drainEvents(msg.events, msg.errs)
+			}
 		}
 		return a, waitForEvent(a.runID, msg.events, msg.errs)
 
@@ -94,11 +103,13 @@ func (a App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return a, nil
 		}
 		a.err = msg.err
-		run := a.running.BuildTestRun(a.lastFiles)
-		a.lastRun = run
-		a.results.SetRun(run)
-		a.updateFileStatuses(run)
-		a.mode = ModeResults
+		if a.mode == ModeRunning {
+			run := a.running.BuildAggregatedRun(a.lastFiles)
+			a.lastRun = run
+			a.results.SetRun(run)
+			a.updateFileStatuses(run)
+			a.mode = ModeResults
+		}
 		return a, nil
 
 	case tea.KeyMsg:
@@ -120,27 +131,35 @@ func (a App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return a, nil
 }
 
-func (a *App) updateFileStatuses(run *domain.TestRun) {
+func (a *App) updateFileStatuses(run *domain.AggregatedRun) {
 	statusMap := make(map[string]domain.TestStatus)
+
+	// Default all tested files to passed
 	for _, f := range a.lastFiles {
-		statusMap[f] = domain.StatusPassed
+		statusMap[f.Path] = domain.StatusPassed
 	}
-	if run.Failed > 0 {
-		for _, f := range a.lastFiles {
-			statusMap[f] = domain.StatusFailed
+
+	// Mark files as failed if their target has failures
+	for _, r := range run.Runs {
+		if r.Failed > 0 {
+			for _, f := range a.lastFiles {
+				if f.TargetName == r.TargetName {
+					statusMap[f.Path] = domain.StatusFailed
+				}
+			}
 		}
 	}
+
 	a.search.UpdatePrevStatus(statusMap)
 }
 
-// cancelRun cancels the current test execution and bumps the runID
-// so any in-flight events from the old run will be ignored.
+// cancelRun cancels the current test execution and bumps the runID.
 func (a *App) cancelRun() {
 	if a.cancel != nil {
 		a.cancel()
 		a.cancel = nil
 	}
-	a.runID++ // stale events will have the old ID and be discarded
+	a.runID++
 }
 
 func (a App) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
@@ -167,7 +186,6 @@ func (a App) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			}
 			return a, nil
 		}
-		// Pass to search model for text input + navigation
 		var cmd tea.Cmd
 		a.search, cmd = a.search.Update(msg)
 		return a, cmd
@@ -175,7 +193,6 @@ func (a App) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case ModeRunning:
 		switch {
 		case key.Matches(msg, runningKeys.Cancel):
-			// Cancel the running test and go back to search
 			a.cancelRun()
 			a.mode = ModeSearch
 			a.search.input.Focus()
@@ -224,8 +241,7 @@ func (a App) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return a, nil
 }
 
-func (a *App) startTests(files []string) tea.Cmd {
-	// Cancel any in-progress run first
+func (a *App) startTests(files []domain.TestFile) tea.Cmd {
 	a.cancelRun()
 
 	a.lastFiles = files
@@ -240,8 +256,7 @@ func (a *App) startTests(files []string) tea.Cmd {
 	return waitForEvent(a.runID, events, errs)
 }
 
-// waitForEvent returns a Cmd that blocks until the next event or completion.
-func waitForEvent(runID uint64, events <-chan *parser.Event, errs <-chan error) tea.Cmd {
+func waitForEvent(runID uint64, events <-chan *runner.TargetEvent, errs <-chan error) tea.Cmd {
 	return func() tea.Msg {
 		select {
 		case ev, ok := <-events:
@@ -256,8 +271,7 @@ func waitForEvent(runID uint64, events <-chan *parser.Event, errs <-chan error) 
 	}
 }
 
-// drainEvents consumes remaining events from a cancelled run to prevent goroutine leaks.
-func drainEvents(events <-chan *parser.Event, errs <-chan error) tea.Cmd {
+func drainEvents(events <-chan *runner.TargetEvent, errs <-chan error) tea.Cmd {
 	return func() tea.Msg {
 		for range events {
 		}
@@ -269,38 +283,55 @@ func drainEvents(events <-chan *parser.Event, errs <-chan error) tea.Cmd {
 // resolveSelectedFile maps the currently selected suite/test in results
 // back to a file path from lastFiles.
 func (a *App) resolveSelectedFile() string {
+	item := a.results.SelectedItem()
+	if item == nil {
+		return ""
+	}
+
 	suite := a.results.SelectedSuite()
 	if suite == nil {
 		return ""
 	}
 
-	// Convert PHP namespace to path: Tests\Feature\Auth\LoginTest → tests/feature/auth/logintest
+	targetName := item.targetName
+
+	// Collect files for this target
+	var targetFiles []domain.TestFile
+	for _, f := range a.lastFiles {
+		if f.TargetName == targetName {
+			targetFiles = append(targetFiles, f)
+		}
+	}
+
+	// Try to match suite name to file path
 	suitePath := strings.ReplaceAll(suite.Name, `\`, "/")
 	suitePath = strings.ToLower(suitePath)
 
-	for _, f := range a.lastFiles {
-		normalized := strings.ToLower(f)
-		withoutExt := strings.TrimSuffix(normalized, ".php")
+	for _, f := range targetFiles {
+		normalized := strings.ToLower(f.Path)
+		ext := filepath.Ext(normalized)
+		withoutExt := strings.TrimSuffix(normalized, ext)
 		if strings.HasSuffix(withoutExt, suitePath) {
-			return f
+			return f.Path
 		}
 	}
 
-	// Try partial match on just the class name (last segment)
+	// Try partial match on just the class/module name (last segment)
 	parts := strings.Split(suitePath, "/")
 	className := parts[len(parts)-1]
-	for _, f := range a.lastFiles {
-		normalized := strings.ToLower(f)
-		withoutExt := strings.TrimSuffix(normalized, ".php")
+	for _, f := range targetFiles {
+		normalized := strings.ToLower(f.Path)
+		ext := filepath.Ext(normalized)
+		withoutExt := strings.TrimSuffix(normalized, ext)
 		segments := strings.Split(withoutExt, "/")
 		if segments[len(segments)-1] == className {
-			return f
+			return f.Path
 		}
 	}
 
-	// If only one file was tested, just return it
-	if len(a.lastFiles) == 1 {
-		return a.lastFiles[0]
+	// If only one file was tested for this target, return it
+	if len(targetFiles) == 1 {
+		return targetFiles[0].Path
 	}
 
 	return ""

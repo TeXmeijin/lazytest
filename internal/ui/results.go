@@ -12,7 +12,7 @@ import (
 
 // ResultsModel displays test results in a split view.
 type ResultsModel struct {
-	run         *domain.TestRun
+	run         *domain.AggregatedRun
 	flatList    []*resultItem
 	cursor      int
 	focusDetail bool
@@ -23,16 +23,17 @@ type ResultsModel struct {
 }
 
 type resultItem struct {
-	suite *domain.TestSuite
-	test  *domain.TestCase
-	depth int // 0 = suite, 1 = test
+	suite      *domain.TestSuite
+	test       *domain.TestCase
+	targetName string
+	depth      int // 0 = target header, 1 = suite, 2 = test
 }
 
 func NewResultsModel() ResultsModel {
 	return ResultsModel{}
 }
 
-func (m *ResultsModel) SetRun(run *domain.TestRun) {
+func (m *ResultsModel) SetRun(run *domain.AggregatedRun) {
 	m.run = run
 	m.cursor = 0
 	m.focusDetail = false
@@ -46,16 +47,21 @@ func (m *ResultsModel) buildFlatList() {
 	if m.run == nil {
 		return
 	}
-	for _, suite := range m.run.Suites {
-		if m.filterFails && suite.ComputeStatus() != domain.StatusFailed {
-			continue
-		}
-		m.flatList = append(m.flatList, &resultItem{suite: suite, depth: 0})
-		for _, tc := range suite.Tests {
-			if m.filterFails && tc.Status != domain.StatusFailed {
+	for _, run := range m.run.Runs {
+		// Add target header
+		m.flatList = append(m.flatList, &resultItem{targetName: run.TargetName, depth: 0})
+
+		for _, suite := range run.Suites {
+			if m.filterFails && suite.ComputeStatus() != domain.StatusFailed {
 				continue
 			}
-			m.flatList = append(m.flatList, &resultItem{test: tc, depth: 1})
+			m.flatList = append(m.flatList, &resultItem{suite: suite, targetName: run.TargetName, depth: 1})
+			for _, tc := range suite.Tests {
+				if m.filterFails && tc.Status != domain.StatusFailed {
+					continue
+				}
+				m.flatList = append(m.flatList, &resultItem{test: tc, targetName: run.TargetName, depth: 2})
+			}
 		}
 	}
 }
@@ -63,6 +69,13 @@ func (m *ResultsModel) buildFlatList() {
 func (m *ResultsModel) SelectedTest() *domain.TestCase {
 	if m.cursor >= 0 && m.cursor < len(m.flatList) {
 		return m.flatList[m.cursor].test
+	}
+	return nil
+}
+
+func (m *ResultsModel) SelectedItem() *resultItem {
+	if m.cursor >= 0 && m.cursor < len(m.flatList) {
+		return m.flatList[m.cursor]
 	}
 	return nil
 }
@@ -170,32 +183,43 @@ func (m ResultsModel) renderTreeView(width, height int) string {
 		selected := i == m.cursor && !m.focusDetail
 
 		var line string
-		if item.suite != nil {
+		switch {
+		case item.depth == 0 && item.suite == nil && item.test == nil:
+			// Target header
+			badge := targetBadge(item.targetName)
+			if selected {
+				line = fmt.Sprintf("%s %s", badge, selectedItemStyle.Render(item.targetName))
+			} else {
+				line = fmt.Sprintf("%s %s", badge, suiteNameStyle.Render(item.targetName))
+			}
+
+		case item.suite != nil:
 			icon := statusStyle(item.suite.ComputeStatus().Icon()).Render(item.suite.ComputeStatus().Icon())
 			name := shortSuiteName(item.suite.Name)
-			if lipgloss.Width(name) > width-4 {
-				name = "…" + name[len(name)-width+5:]
+			if lipgloss.Width(name) > width-6 {
+				name = "..." + name[len(name)-width+7:]
 			}
 			if selected {
-				line = fmt.Sprintf("%s %s", icon, selectedItemStyle.Render(name))
+				line = fmt.Sprintf("  %s %s", icon, selectedItemStyle.Render(name))
 			} else {
-				line = fmt.Sprintf("%s %s", icon, suiteNameStyle.Render(name))
+				line = fmt.Sprintf("  %s %s", icon, suiteNameStyle.Render(name))
 			}
-		} else if item.test != nil {
+
+		case item.test != nil:
 			icon := statusStyle(item.test.Status.Icon()).Render(item.test.Status.Icon())
 			dur := ""
 			if item.test.Duration > 0 {
 				dur = durationStyle.Render(fmt.Sprintf(" %dms", item.test.Duration.Milliseconds()))
 			}
 			name := item.test.Name
-			maxName := width - 8 - lipgloss.Width(dur)
+			maxName := width - 10 - lipgloss.Width(dur)
 			if maxName > 0 && len(name) > maxName {
-				name = name[:maxName-1] + "…"
+				name = name[:maxName-1] + "..."
 			}
 			if selected {
-				line = fmt.Sprintf("  %s %s%s", icon, selectedItemStyle.Render(name), dur)
+				line = fmt.Sprintf("    %s %s%s", icon, selectedItemStyle.Render(name), dur)
 			} else {
-				line = fmt.Sprintf("  %s %s%s", icon, testNameStyle.Render(name), dur)
+				line = fmt.Sprintf("    %s %s%s", icon, testNameStyle.Render(name), dur)
 			}
 		}
 
@@ -210,7 +234,6 @@ func (m ResultsModel) renderTreeView(width, height int) string {
 }
 
 // shortSuiteName extracts the last segment of a namespace for display.
-// e.g. "Tests\Feature\Auth\LoginTest" → "Auth\LoginTest"
 func shortSuiteName(name string) string {
 	// Try backslash (PHP namespace)
 	parts := strings.Split(name, `\`)
@@ -233,7 +256,32 @@ func (m ResultsModel) renderDetailView(width, height int) string {
 	item := m.flatList[m.cursor]
 	var lines []string
 
-	if item.suite != nil {
+	switch {
+	case item.depth == 0 && item.suite == nil && item.test == nil:
+		// Target header - show target summary
+		badge := targetBadge(item.targetName)
+		lines = append(lines, badge+" "+titleStyle.Render(item.targetName))
+		lines = append(lines, "")
+
+		// Find the run for this target
+		for _, run := range m.run.Runs {
+			if run.TargetName == item.targetName {
+				total := run.Passed + run.Failed + run.Skipped
+				lines = append(lines, normalItemStyle.Render(fmt.Sprintf("  Tests: %d", total)))
+				lines = append(lines, fmt.Sprintf("  %s %d passed", passedStyle.Render("✓"), run.Passed))
+				if run.Failed > 0 {
+					lines = append(lines, fmt.Sprintf("  %s %d failed", failedStyle.Render("✗"), run.Failed))
+				}
+				if run.Skipped > 0 {
+					lines = append(lines, fmt.Sprintf("  %s %d skipped", skippedStyle.Render("⊘"), run.Skipped))
+				}
+				lines = append(lines, "")
+				lines = append(lines, durationStyle.Render(fmt.Sprintf("  Duration: %dms", run.Duration.Milliseconds())))
+				break
+			}
+		}
+
+	case item.suite != nil:
 		lines = append(lines, titleStyle.Render(shortSuiteName(item.suite.Name)))
 		lines = append(lines, "")
 
@@ -262,7 +310,6 @@ func (m ResultsModel) renderDetailView(width, height int) string {
 			lines = append(lines, durationStyle.Render(fmt.Sprintf("  Duration: %dms", item.suite.Duration.Milliseconds())))
 		}
 
-		// List failed tests in this suite
 		var failedTests []*domain.TestCase
 		for _, tc := range item.suite.Tests {
 			if tc.Status == domain.StatusFailed {
@@ -279,10 +326,10 @@ func (m ResultsModel) renderDetailView(width, height int) string {
 				}
 			}
 		}
-	} else if item.test != nil {
+
+	case item.test != nil:
 		tc := item.test
 
-		// Header: status icon + test name
 		var headerStyle lipgloss.Style
 		switch tc.Status {
 		case domain.StatusPassed:
@@ -296,7 +343,6 @@ func (m ResultsModel) renderDetailView(width, height int) string {
 		}
 		lines = append(lines, headerStyle.Render(tc.Status.Icon()+" "+tc.Name))
 
-		// Duration
 		if tc.Duration > 0 {
 			lines = append(lines, durationStyle.Render(fmt.Sprintf("  %dms", tc.Duration.Milliseconds())))
 		}
