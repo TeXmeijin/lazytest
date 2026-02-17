@@ -1,8 +1,8 @@
-# lazytest
+# LazyTest
 
 A TUI test runner for **monorepos**, built with Go and [Bubble Tea](https://github.com/charmbracelet/bubbletea).
 
-lazytest parses [TeamCity format](https://www.jetbrains.com/help/teamcity/service-messages.html#Reporting+Tests) output in real time and displays results interactively in your terminal. Run PHPUnit, Vitest, Jest, pytest and more — side by side from a single TUI.
+LazyTest parses [TeamCity format](https://www.jetbrains.com/help/teamcity/service-messages.html#Reporting+Tests) output in real time and displays results interactively in your terminal. Run PHPUnit, Vitest, Jest, pytest and more — side by side from a single TUI.
 
 ## Features
 
@@ -40,7 +40,7 @@ Run `lazytest` in any directory containing `phpunit.xml` or `vitest.config.ts`:
 lazytest
 ```
 
-lazytest auto-detects test frameworks and scans for test files.
+LazyTest auto-detects test frameworks and scans for test files.
 
 ## Configuration
 
@@ -89,7 +89,7 @@ targets:
 | `phpunit` | `*Test.php`            | `./vendor/bin/phpunit --teamcity {files}`      | `tests/`    |
 | `vitest`  | `*.test.ts,*.test.tsx` | `npx vitest run --reporter=teamcity {files}`   | `src/`      |
 
-If no `.lazytest.yml` is found, lazytest walks up to 3 directory levels to auto-detect `phpunit.xml` and `vitest.config.{ts,mts,js}`.
+If no `.lazytest.yml` is found, LazyTest walks up to 3 directory levels to auto-detect `phpunit.xml` and `vitest.config.{ts,mts,js}`.
 
 ## Key Bindings
 
@@ -128,7 +128,7 @@ If no `.lazytest.yml` is found, lazytest walks up to 3 directory levels to auto-
 
 ## Framework Setup
 
-lazytest works with any test runner that outputs [TeamCity service messages](https://www.jetbrains.com/help/teamcity/service-messages.html#Reporting+Tests).
+LazyTest works with any test runner that outputs [TeamCity service messages](https://www.jetbrains.com/help/teamcity/service-messages.html#Reporting+Tests).
 
 **PHPUnit** — built-in `--teamcity` flag:
 ```yaml
