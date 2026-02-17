@@ -245,7 +245,7 @@ func (a *App) startTests(files []domain.TestFile) tea.Cmd {
 	a.cancelRun()
 
 	a.lastFiles = files
-	a.running.Reset()
+	a.running.Reset(files)
 	a.mode = ModeRunning
 
 	ctx, cancel := context.WithCancel(context.Background())

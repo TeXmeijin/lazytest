@@ -29,9 +29,20 @@ func NewRunningModel() RunningModel {
 	return RunningModel{}
 }
 
-func (m *RunningModel) Reset() {
+// Reset clears state and pre-registers expected targets so AllDone()
+// won't return true before slower targets produce any output.
+func (m *RunningModel) Reset(files []domain.TestFile) {
 	m.targetRuns = make(map[string]*targetRunState)
 	m.targetOrder = nil
+
+	seen := make(map[string]bool)
+	for _, f := range files {
+		if !seen[f.TargetName] {
+			seen[f.TargetName] = true
+			m.targetRuns[f.TargetName] = &targetRunState{}
+			m.targetOrder = append(m.targetOrder, f.TargetName)
+		}
+	}
 }
 
 func (m *RunningModel) HandleEvent(te *runner.TargetEvent) {
