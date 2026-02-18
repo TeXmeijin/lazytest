@@ -1,0 +1,9 @@
+{
+  "private": true,
+  "devDependencies": {
+    "jest": "^29.0.0",
+    "@jest/globals": "^29.0.0",
+    "ts-jest": "^29.0.0",
+    "typescript": "^5.0.0"
+  }
+}
