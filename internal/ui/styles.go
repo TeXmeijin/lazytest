@@ -16,6 +16,7 @@ var (
 	// Target badge colors
 	colorPHPUnit = lipgloss.Color("#4F5B93") // blue-ish (PHP)
 	colorVitest  = lipgloss.Color("#729B1B") // green-ish (Vitest)
+	colorJest    = lipgloss.Color("#C63D14") // red-ish (Jest)
 
 	// Box styles
 	boxStyle = lipgloss.NewStyle().
@@ -114,6 +115,12 @@ var (
 				Background(colorVitest).
 				Bold(true).
 				Padding(0, 1)
+
+	jestBadgeStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("#FFFFFF")).
+			Background(colorJest).
+			Bold(true).
+			Padding(0, 1)
 )
 
 func statusStyle(icon string) lipgloss.Style {
@@ -140,6 +147,8 @@ func targetBadge(name string) string {
 		return phpunitBadgeStyle.Render("PHP")
 	case "vitest":
 		return vitestBadgeStyle.Render("VT")
+	case "jest":
+		return jestBadgeStyle.Render("JT")
 	default:
 		return lipgloss.NewStyle().
 			Foreground(lipgloss.Color("#FFFFFF")).

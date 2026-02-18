@@ -101,6 +101,26 @@ func TestBuildCommandVitest(t *testing.T) {
 	}
 }
 
+func TestBuildCommandJest(t *testing.T) {
+	e := NewExecutor(config.Config{
+		Targets: []config.Target{
+			{Name: "jest", Command: "npx jest --reporters={reporter} {files}"},
+		},
+	})
+
+	cmd := e.BuildCommand("jest", []string{"src/App.test.ts", "src/Page.test.tsx"})
+	// {reporter} should be replaced with the actual temp file path
+	if strings.Contains(cmd, "{reporter}") {
+		t.Errorf("command still contains {reporter} placeholder: %q", cmd)
+	}
+	if !strings.Contains(cmd, "lazytest-jest-reporter.js") {
+		t.Errorf("command does not contain jest reporter path: %q", cmd)
+	}
+	if !strings.Contains(cmd, "src/App.test.ts src/Page.test.tsx") {
+		t.Errorf("command does not contain expected files: %q", cmd)
+	}
+}
+
 func TestBuildCommandUnknownTarget(t *testing.T) {
 	e := NewExecutor(config.Config{
 		Targets: []config.Target{
