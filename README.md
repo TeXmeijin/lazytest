@@ -4,7 +4,7 @@
 
 PHPUnit and Vitest in the same project? Backend tests behind Docker, frontend tests on bare metal? Different working directories, different file patterns, different everything? LazyTest handles all of it from a single TUI — no tab-switching, no re-running scripts, no context-switching between frameworks.
 
-![LazyTest Demo](demo.gif)
+![LazyTest Demo](demo.gif?v=2)
 
 ---
 
