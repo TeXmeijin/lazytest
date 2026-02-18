@@ -4,12 +4,12 @@ import "github.com/charmbracelet/bubbles/key"
 
 // SearchKeyMap defines key bindings for the search mode.
 type SearchKeyMap struct {
-	Run    key.Binding
-	RunAll key.Binding
-	Tab    key.Binding
-	Up     key.Binding
-	Down   key.Binding
-	Quit   key.Binding
+	Run       key.Binding
+	Toggle    key.Binding
+	SelectAll key.Binding
+	Up        key.Binding
+	Down      key.Binding
+	Quit      key.Binding
 }
 
 var searchKeys = SearchKeyMap{
@@ -17,20 +17,20 @@ var searchKeys = SearchKeyMap{
 		key.WithKeys("enter"),
 		key.WithHelp("Enter", "run"),
 	),
-	RunAll: key.NewBinding(
-		key.WithKeys("ctrl+a"),
-		key.WithHelp("Ctrl+A", "run all"),
-	),
-	Tab: key.NewBinding(
+	Toggle: key.NewBinding(
 		key.WithKeys("tab"),
-		key.WithHelp("Tab", "results"),
+		key.WithHelp("Tab", "select"),
+	),
+	SelectAll: key.NewBinding(
+		key.WithKeys("ctrl+a"),
+		key.WithHelp("Ctrl+A", "select all"),
 	),
 	Up: key.NewBinding(
-		key.WithKeys("up", "ctrl+p"),
+		key.WithKeys("up", "ctrl+p", "ctrl+k"),
 		key.WithHelp("↑", "up"),
 	),
 	Down: key.NewBinding(
-		key.WithKeys("down", "ctrl+n"),
+		key.WithKeys("down", "ctrl+n", "ctrl+j"),
 		key.WithHelp("↓", "down"),
 	),
 	Quit: key.NewBinding(

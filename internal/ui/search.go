@@ -15,10 +15,16 @@ import (
 type SearchModel struct {
 	input    textinput.Model
 	allFiles []domain.TestFile
-	filtered []domain.TestFile
+	filtered []matchedFile
+	selected map[string]bool // fileKey → true
 	cursor   int
 	width    int
 	height   int
+}
+
+// fileKey returns a unique key for a TestFile.
+func fileKey(f domain.TestFile) string {
+	return f.TargetName + "\x00" + f.Path
 }
 
 func NewSearchModel(files []domain.TestFile) SearchModel {
@@ -32,12 +38,14 @@ func NewSearchModel(files []domain.TestFile) SearchModel {
 	return SearchModel{
 		input:    ti,
 		allFiles: files,
-		filtered: files,
+		filtered: filterFuzzy(files, ""),
+		selected: make(map[string]bool),
 	}
 }
 
 func (m *SearchModel) SetFiles(files []domain.TestFile) {
 	m.allFiles = files
+	m.selected = make(map[string]bool)
 	m.applyFilter()
 }
 
@@ -52,13 +60,40 @@ func (m *SearchModel) UpdatePrevStatus(results map[string]domain.TestStatus) {
 
 func (m *SearchModel) ClearInput() {
 	m.input.SetValue("")
+	m.selected = make(map[string]bool)
 	m.applyFilter()
+}
+
+// SelectedFiles returns the files to run.
+// If any files are toggled, returns all toggled files (in original order).
+// Otherwise returns just the cursor file.
+func (m *SearchModel) SelectedFiles() []domain.TestFile {
+	if len(m.selected) > 0 {
+		var files []domain.TestFile
+		for _, f := range m.allFiles {
+			if m.selected[fileKey(f)] {
+				files = append(files, f)
+			}
+		}
+		return files
+	}
+	if len(m.filtered) > 0 {
+		return []domain.TestFile{m.filtered[m.cursor].file}
+	}
+	return nil
+}
+
+// SelectedCount returns the number of toggled files.
+func (m *SearchModel) SelectedCount() int {
+	return len(m.selected)
 }
 
 // FilteredFiles returns the currently filtered files as TestFile slice.
 func (m *SearchModel) FilteredFiles() []domain.TestFile {
 	result := make([]domain.TestFile, len(m.filtered))
-	copy(result, m.filtered)
+	for i, mf := range m.filtered {
+		result[i] = mf.file
+	}
 	return result
 }
 
@@ -67,6 +102,43 @@ func (m *SearchModel) AllFiles() []domain.TestFile {
 	result := make([]domain.TestFile, len(m.allFiles))
 	copy(result, m.allFiles)
 	return result
+}
+
+// ToggleSelection toggles the cursor file and moves cursor down.
+func (m *SearchModel) ToggleSelection() {
+	if len(m.filtered) == 0 {
+		return
+	}
+	f := m.filtered[m.cursor].file
+	k := fileKey(f)
+	if m.selected[k] {
+		delete(m.selected, k)
+	} else {
+		m.selected[k] = true
+	}
+	if m.cursor < len(m.filtered)-1 {
+		m.cursor++
+	}
+}
+
+// ToggleAll selects all filtered files, or deselects all if already all selected.
+func (m *SearchModel) ToggleAll() {
+	allSelected := true
+	for _, mf := range m.filtered {
+		if !m.selected[fileKey(mf.file)] {
+			allSelected = false
+			break
+		}
+	}
+	if allSelected {
+		for _, mf := range m.filtered {
+			delete(m.selected, fileKey(mf.file))
+		}
+	} else {
+		for _, mf := range m.filtered {
+			m.selected[fileKey(mf.file)] = true
+		}
+	}
 }
 
 func (m SearchModel) Update(msg tea.Msg) (SearchModel, tea.Cmd) {
@@ -83,6 +155,12 @@ func (m SearchModel) Update(msg tea.Msg) (SearchModel, tea.Cmd) {
 				m.cursor++
 			}
 			return m, nil
+		case key.Matches(msg, searchKeys.Toggle):
+			m.ToggleSelection()
+			return m, nil
+		case key.Matches(msg, searchKeys.SelectAll):
+			m.ToggleAll()
+			return m, nil
 		}
 	}
 
@@ -96,17 +174,7 @@ func (m SearchModel) Update(msg tea.Msg) (SearchModel, tea.Cmd) {
 }
 
 func (m *SearchModel) applyFilter() {
-	query := strings.ToLower(m.input.Value())
-	if query == "" {
-		m.filtered = m.allFiles
-	} else {
-		m.filtered = nil
-		for _, f := range m.allFiles {
-			if strings.Contains(strings.ToLower(f.Path), query) {
-				m.filtered = append(m.filtered, f)
-			}
-		}
-	}
+	m.filtered = filterFuzzy(m.allFiles, m.input.Value())
 	if m.cursor >= len(m.filtered) {
 		m.cursor = max(0, len(m.filtered)-1)
 	}
@@ -114,9 +182,10 @@ func (m *SearchModel) applyFilter() {
 
 func (m SearchModel) View(width, height int) string {
 	// Header: search input + count
+	selCount := len(m.selected)
 	countLabel := fmt.Sprintf("%d/%d files", len(m.filtered), len(m.allFiles))
-	if m.input.Value() != "" && len(m.filtered) > 0 {
-		countLabel = fmt.Sprintf("%d/%d files (Enter: run %d)", len(m.filtered), len(m.allFiles), len(m.filtered))
+	if selCount > 0 {
+		countLabel = fmt.Sprintf("%d/%d files (%d selected)", len(m.filtered), len(m.allFiles), selCount)
 	}
 	countStr := searchCountStyle.Render(countLabel)
 	inputView := m.input.View()
@@ -147,12 +216,22 @@ func (m SearchModel) View(width, height int) string {
 
 	var lines []string
 	for i := start; i < end; i++ {
-		f := m.filtered[i]
+		mf := m.filtered[i]
+		f := mf.file
+		isSelected := m.selected[fileKey(f)]
 		style := normalItemStyle
+		hlStyle := matchHighlightStyle
 		prefix := "  "
 		if i == m.cursor {
 			style = selectedItemStyle
+			hlStyle = selectedMatchHighlightStyle
 			prefix = "▸ "
+		}
+
+		// Selection marker
+		marker := " "
+		if isSelected {
+			marker = selectedMarkerStyle.Render("◆")
 		}
 
 		// Previous status icon
@@ -169,7 +248,8 @@ func (m SearchModel) View(width, height int) string {
 		// Target badge
 		badge := targetBadge(f.TargetName)
 
-		line := fmt.Sprintf("%s%s %s", prefix, badge, style.Render(f.Path))
+		renderedPath := renderWithHighlight(f.Path, mf.indices, style, hlStyle)
+		line := fmt.Sprintf("%s%s%s %s", prefix, marker, badge, renderedPath)
 		pad := width - lipgloss.Width(line) - lipgloss.Width(statusIcon) - 2
 		if pad < 1 {
 			pad = 1

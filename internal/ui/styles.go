@@ -76,6 +76,20 @@ var (
 	searchCountStyle = lipgloss.NewStyle().
 				Foreground(colorMuted)
 
+	// Fuzzy match highlights
+	matchHighlightStyle = lipgloss.NewStyle().
+				Foreground(lipgloss.Color("#F59E0B")). // amber
+				Bold(true)
+
+	selectedMatchHighlightStyle = lipgloss.NewStyle().
+					Foreground(lipgloss.Color("#FCD34D")). // lighter amber for selected row
+					Bold(true)
+
+	// Selection marker
+	selectedMarkerStyle = lipgloss.NewStyle().
+				Foreground(colorPrimary).
+				Bold(true)
+
 	// Help bar
 	helpKeyStyle = lipgloss.NewStyle().
 			Foreground(colorPrimary).

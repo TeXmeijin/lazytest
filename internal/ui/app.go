@@ -168,20 +168,9 @@ func (a App) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		case key.Matches(msg, searchKeys.Quit):
 			return a, tea.Quit
 		case key.Matches(msg, searchKeys.Run):
-			files := a.search.FilteredFiles()
+			files := a.search.SelectedFiles()
 			if len(files) > 0 {
 				return a, a.startTests(files)
-			}
-			return a, nil
-		case key.Matches(msg, searchKeys.RunAll):
-			files := a.search.AllFiles()
-			if len(files) > 0 {
-				return a, a.startTests(files)
-			}
-			return a, nil
-		case key.Matches(msg, searchKeys.Tab):
-			if a.lastRun != nil {
-				a.mode = ModeResults
 			}
 			return a, nil
 		}

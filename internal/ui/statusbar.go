@@ -32,9 +32,9 @@ func renderHelpBar(mode Mode, width int) string {
 	switch mode {
 	case ModeSearch:
 		items = []string{
-			helpKeyStyle.Render("[Enter]") + " " + helpDescStyle.Render("run matched"),
-			helpKeyStyle.Render("[Ctrl+A]") + " " + helpDescStyle.Render("run all"),
-			helpKeyStyle.Render("[Tab]") + " " + helpDescStyle.Render("results"),
+			helpKeyStyle.Render("[Tab]") + " " + helpDescStyle.Render("select"),
+			helpKeyStyle.Render("[Ctrl+A]") + " " + helpDescStyle.Render("select all"),
+			helpKeyStyle.Render("[Enter]") + " " + helpDescStyle.Render("run"),
 			helpKeyStyle.Render("[Ctrl+C]") + " " + helpDescStyle.Render("quit"),
 		}
 	case ModeRunning:
