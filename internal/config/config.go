@@ -22,7 +22,6 @@ type Target struct {
 // Config represents the lazytest configuration.
 type Config struct {
 	Targets []Target `yaml:"targets"`
-	Editor  string   `yaml:"editor"`
 }
 
 // Load reads configuration from the given path or auto-detects.
@@ -62,13 +61,6 @@ func Load(configPath string) (Config, error) {
 
 // applyDefaults fills in missing Config-level fields.
 func (c *Config) applyDefaults() {
-	if c.Editor == "" {
-		if editor := os.Getenv("LAZYTEST_EDITOR"); editor != "" {
-			c.Editor = editor
-		} else {
-			c.Editor = "zed"
-		}
-	}
 }
 
 // applyDefaults fills in missing Target fields based on the target name.

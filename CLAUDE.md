@@ -63,7 +63,6 @@ internal/
 ### 設定構造
 
 ```yaml
-editor: zed
 targets:
   - name: phpunit          # ターゲット名（デフォルト値の決定に使用）
     command: "..."         # {files} / {file} がテストパスに展開される
@@ -77,7 +76,7 @@ targets:
 
 - **SearchMode**: テストファイル検索・選択（ターゲットバッジ付き）→ Enter で RunningMode へ
 - **RunningMode**: ターゲット別リアルタイム進捗表示 → 全完了で ResultsMode へ
-- **ResultsMode**: 統合結果表示（ターゲットバッジ付き）、`r` で再実行、`o` でエディタ起動、`f` で失敗フィルタ → Enter/Esc で SearchMode へ
+- **ResultsMode**: 統合結果表示（ターゲットバッジ付き）、`r` で再実行、`o` でOSデフォルトエディタで開く、`f` で失敗フィルタ → Enter/Esc で SearchMode へ
 
 ### 主要な依存ライブラリ
 

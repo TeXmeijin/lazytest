@@ -9,8 +9,7 @@ import (
 func TestLoadMultiTargetYAML(t *testing.T) {
 	dir := t.TempDir()
 
-	yamlContent := `editor: zed
-targets:
+	yamlContent := `targets:
   - name: phpunit
     command: "docker compose exec app php artisan test --teamcity {files}"
     test_dirs:
@@ -35,9 +34,6 @@ targets:
 		t.Fatalf("Load returned error: %v", err)
 	}
 
-	if cfg.Editor != "zed" {
-		t.Errorf("Editor = %q, want zed", cfg.Editor)
-	}
 	if len(cfg.Targets) != 2 {
 		t.Fatalf("Targets length = %d, want 2", len(cfg.Targets))
 	}

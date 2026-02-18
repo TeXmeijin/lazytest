@@ -4,6 +4,7 @@ import (
 	"context"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 
 	"github.com/charmbracelet/bubbles/key"
@@ -45,7 +46,6 @@ type App struct {
 	results   ResultsModel
 	executor  *runner.Executor
 	config    config.Config
-	editor    string
 	lastRun   *domain.AggregatedRun
 	lastFiles []domain.TestFile
 	cancel    context.CancelFunc
@@ -63,7 +63,6 @@ func NewApp(cfg config.Config, files []domain.TestFile) App {
 		results:  NewResultsModel(),
 		executor: runner.NewExecutor(cfg),
 		config:   cfg,
-		editor:   cfg.Editor,
 	}
 }
 
@@ -229,7 +228,7 @@ func (a App) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return a, nil
 		case key.Matches(msg, resultsKeys.Open):
 			if filePath := a.resolveSelectedFile(); filePath != "" {
-				return a, openFileCmd(a.editor, filePath)
+				return a, openFileCmd(filePath)
 			}
 			return a, nil
 		}
@@ -337,9 +336,17 @@ func (a *App) resolveSelectedFile() string {
 	return ""
 }
 
-func openFileCmd(editor, filePath string) tea.Cmd {
+func openFileCmd(filePath string) tea.Cmd {
 	return func() tea.Msg {
-		cmd := exec.Command(editor, filePath)
+		var cmd *exec.Cmd
+		switch runtime.GOOS {
+		case "darwin":
+			cmd = exec.Command("open", filePath)
+		case "windows":
+			cmd = exec.Command("cmd", "/c", "start", "", filePath)
+		default:
+			cmd = exec.Command("xdg-open", filePath)
+		}
 		cmd.Start()
 		return nil
 	}
