@@ -135,19 +135,20 @@ Create a `.lazytest.yml` in your project root:
 ```yaml
 targets:
   - name: phpunit
-    command: "docker compose exec app php artisan test --teamcity {files}"
+    command: "docker compose exec php-fpm ./vendor/bin/phpunit --teamcity {files}"
     test_dirs:
-      - backend/src/tests/
+      - server/src/tests/
     file_pattern: "*Test.php"
-    path_strip_prefix: "backend/src/"
+    path_strip_prefix: "server/src/"
+    working_dir: "server/"
 
   - name: vitest
     command: "npx vitest run --reporter={reporter} {files}"
     test_dirs:
-      - frontend/next/src/
-      - frontend/next/app/
+      - client/next/src/
+      - client/next/app/
     file_pattern: "*.test.ts,*.test.tsx"
-    working_dir: "frontend/next/"
+    working_dir: "client/next/"
 ```
 
 ### Target Options
