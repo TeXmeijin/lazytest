@@ -22,11 +22,32 @@ LazyTest parses [TeamCity format](https://www.jetbrains.com/help/teamcity/servic
 
 ## Install
 
+### Pre-built binary (recommended)
+
+Download the latest binary from the [Releases page](https://github.com/meijin/lazytest/releases/latest).
+
+| OS      | File                              |
+|---------|-----------------------------------|
+| macOS (Apple Silicon) | `lazytest_darwin_arm64.tar.gz` |
+| macOS (Intel)         | `lazytest_darwin_amd64.tar.gz` |
+| Linux (x86_64)        | `lazytest_linux_amd64.tar.gz`  |
+| Linux (ARM64)         | `lazytest_linux_arm64.tar.gz`  |
+| Windows (x86_64)      | `lazytest_windows_amd64.zip`   |
+
+Extract and move the binary to a directory on your `$PATH`:
+
+```bash
+tar xzf lazytest_darwin_arm64.tar.gz
+mv lazytest /usr/local/bin/
+```
+
+### go install
+
 ```bash
 go install github.com/meijin/lazytest/cmd/lazytest@latest
 ```
 
-Or build from source:
+### Build from source
 
 ```bash
 git clone https://github.com/meijin/lazytest.git

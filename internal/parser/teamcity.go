@@ -166,21 +166,63 @@ func parseDuration(s string) time.Duration {
 }
 
 // ParseStream reads from an io.Reader line by line and sends Events to the channel.
+// It auto-detects the output format (TeamCity or TAP) from the first meaningful line.
 func ParseStream(r io.Reader, events chan<- *Event) {
 	defer close(events)
 	scanner := bufio.NewScanner(r)
 	// Increase buffer size for long lines
 	scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
 
+	type streamFormat int
+	const (
+		formatUnknown streamFormat = iota
+		formatTeamCity
+		formatTAP
+	)
+
+	detected := formatUnknown
+	var tapParser *TAPParser
+
 	for scanner.Scan() {
 		line := scanner.Text()
-		ev := ParseLine(line)
-		if ev == nil {
-			// Non-TeamCity output
+
+		if detected == formatUnknown {
+			trimmed := strings.TrimSpace(line)
+			if strings.HasPrefix(trimmed, "##teamcity[") {
+				detected = formatTeamCity
+				ev := ParseLine(line)
+				if ev == nil {
+					events <- &Event{Type: EventOutput, RawLine: line}
+				} else {
+					events <- ev
+				}
+				continue
+			}
+			if strings.HasPrefix(trimmed, "TAP version") || tapPlanRe.MatchString(trimmed) {
+				detected = formatTAP
+				tapParser = NewTAPParser(events)
+				continue
+			}
+			// Not recognized yet - output as raw
 			events <- &Event{Type: EventOutput, RawLine: line}
-		} else {
-			events <- ev
+			continue
 		}
+
+		switch detected {
+		case formatTeamCity:
+			ev := ParseLine(line)
+			if ev == nil {
+				events <- &Event{Type: EventOutput, RawLine: line}
+			} else {
+				events <- ev
+			}
+		case formatTAP:
+			tapParser.ParseLine(line)
+		}
+	}
+
+	if tapParser != nil {
+		tapParser.Flush()
 	}
 }
 
