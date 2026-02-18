@@ -121,7 +121,7 @@ func TestLoadVitestDefaults(t *testing.T) {
 	if vt.FilePattern != "*.test.ts,*.test.tsx" {
 		t.Errorf("FilePattern default = %q, want *.test.ts,*.test.tsx", vt.FilePattern)
 	}
-	if vt.Command != "npx vitest run --reporter=teamcity {files}" {
+	if vt.Command != "npx vitest run --reporter={reporter} {files}" {
 		t.Errorf("Command default = %q", vt.Command)
 	}
 	if len(vt.TestDirs) != 1 || vt.TestDirs[0] != "src/" {
@@ -199,7 +199,7 @@ func TestTargetApplyDefaultsVitest(t *testing.T) {
 	if target.FilePattern != "*.test.ts,*.test.tsx" {
 		t.Errorf("FilePattern = %q", target.FilePattern)
 	}
-	if target.Command != "npx vitest run --reporter=teamcity {files}" {
+	if target.Command != "npx vitest run --reporter={reporter} {files}" {
 		t.Errorf("Command = %q", target.Command)
 	}
 	if len(target.TestDirs) != 1 || target.TestDirs[0] != "src/" {

@@ -71,7 +71,7 @@ func (t *Target) applyDefaults() {
 			t.FilePattern = "*.test.ts,*.test.tsx"
 		}
 		if t.Command == "" {
-			t.Command = "npx vitest run --reporter=teamcity {files}"
+			t.Command = "npx vitest run --reporter={reporter} {files}"
 		}
 		if len(t.TestDirs) == 0 {
 			t.TestDirs = []string{"src/"}

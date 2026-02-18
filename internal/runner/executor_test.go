@@ -1,6 +1,7 @@
 package runner
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/meijin/lazytest/internal/config"
@@ -83,14 +84,20 @@ func TestBuildCommandEmptyFiles(t *testing.T) {
 func TestBuildCommandVitest(t *testing.T) {
 	e := NewExecutor(config.Config{
 		Targets: []config.Target{
-			{Name: "vitest", Command: "npx vitest run --reporter=teamcity {files}"},
+			{Name: "vitest", Command: "npx vitest run --reporter={reporter} {files}"},
 		},
 	})
 
 	cmd := e.BuildCommand("vitest", []string{"src/App.test.ts", "src/Page.test.tsx"})
-	expected := "npx vitest run --reporter=teamcity src/App.test.ts src/Page.test.tsx"
-	if cmd != expected {
-		t.Errorf("got %q, want %q", cmd, expected)
+	// {reporter} should be replaced with the actual temp file path
+	if strings.Contains(cmd, "{reporter}") {
+		t.Errorf("command still contains {reporter} placeholder: %q", cmd)
+	}
+	if !strings.Contains(cmd, "lazytest-vitest-reporter.mjs") {
+		t.Errorf("command does not contain reporter path: %q", cmd)
+	}
+	if !strings.Contains(cmd, "src/App.test.ts src/Page.test.tsx") {
+		t.Errorf("command does not contain expected files: %q", cmd)
 	}
 }
 
@@ -111,7 +118,7 @@ func TestBuildCommandMultipleTargets(t *testing.T) {
 	e := NewExecutor(config.Config{
 		Targets: []config.Target{
 			{Name: "phpunit", Command: "phpunit --teamcity {files}"},
-			{Name: "vitest", Command: "npx vitest run --reporter=teamcity {files}"},
+			{Name: "vitest", Command: "npx vitest run --reporter={reporter} {files}"},
 		},
 	})
 
@@ -121,7 +128,10 @@ func TestBuildCommandMultipleTargets(t *testing.T) {
 	if phpCmd != "phpunit --teamcity tests/FooTest.php" {
 		t.Errorf("phpunit cmd = %q", phpCmd)
 	}
-	if vtCmd != "npx vitest run --reporter=teamcity src/App.test.ts" {
-		t.Errorf("vitest cmd = %q", vtCmd)
+	if !strings.Contains(vtCmd, "lazytest-vitest-reporter.mjs") {
+		t.Errorf("vitest cmd missing reporter path: %q", vtCmd)
+	}
+	if !strings.Contains(vtCmd, "src/App.test.ts") {
+		t.Errorf("vitest cmd missing file: %q", vtCmd)
 	}
 }

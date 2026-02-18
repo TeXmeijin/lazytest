@@ -9,6 +9,7 @@ import (
 	"github.com/meijin/lazytest/internal/config"
 	"github.com/meijin/lazytest/internal/domain"
 	"github.com/meijin/lazytest/internal/parser"
+	"github.com/meijin/lazytest/internal/reporter"
 )
 
 // TargetEvent wraps an event with its source target name.
@@ -21,7 +22,8 @@ type TargetEvent struct {
 
 // Executor manages test command execution across multiple targets.
 type Executor struct {
-	Targets map[string]config.Target
+	Targets      map[string]config.Target
+	reporterPath string
 }
 
 // NewExecutor creates a new Executor with the given config.
@@ -30,7 +32,8 @@ func NewExecutor(cfg config.Config) *Executor {
 	for _, t := range cfg.Targets {
 		targets[t.Name] = t
 	}
-	return &Executor{Targets: targets}
+	reporterPath, _ := reporter.EnsureVitestReporter()
+	return &Executor{Targets: targets, reporterPath: reporterPath}
 }
 
 // BuildCommand constructs the full command string for a specific target.
@@ -59,6 +62,8 @@ func (e *Executor) BuildCommand(targetName string, files []string) string {
 	if len(transformed) > 0 {
 		cmd = strings.ReplaceAll(cmd, "{file}", transformed[0])
 	}
+
+	cmd = strings.ReplaceAll(cmd, "{reporter}", e.reporterPath)
 
 	return cmd
 }
@@ -124,14 +129,14 @@ func (e *Executor) runTarget(ctx context.Context, targetName string, target conf
 	}
 
 	targetEvents := make(chan *parser.Event, 100)
-	hasTeamcityOutput := false
+	hasStructuredOutput := false
 	go func() {
 		parser.ParseStream(stdout, targetEvents)
 	}()
 
 	for ev := range targetEvents {
 		if ev.Type != parser.EventOutput {
-			hasTeamcityOutput = true
+			hasStructuredOutput = true
 		}
 		out <- &TargetEvent{
 			TargetName: targetName,
@@ -145,7 +150,7 @@ func (e *Executor) runTarget(ctx context.Context, targetName string, target conf
 
 	doneEvent := &TargetEvent{TargetName: targetName, Done: true}
 	// If no TeamCity output was produced and the command failed, report the error
-	if !hasTeamcityOutput && waitErr != nil {
+	if !hasStructuredOutput && waitErr != nil {
 		errMsg := stderrBuf.String()
 		if errMsg == "" {
 			errMsg = waitErr.Error()
