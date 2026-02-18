@@ -170,7 +170,7 @@ When a field is omitted, defaults are applied based on the target name:
 |-----------|------------------------------------------|--------------------------------------------------------|-------------|
 | `phpunit` | `*Test.php`                              | `./vendor/bin/phpunit --teamcity {files}`              | `tests/`    |
 | `vitest`  | `*.test.ts,*.test.tsx`                   | `npx vitest run --reporter={reporter} {files}`         | `src/`      |
-| `jest`    | `*.test.ts,*.test.tsx,*.test.js,*.test.jsx` | `npx jest --reporters={reporter} {files}`           | `src/`      |
+| `jest`    | `*.test.ts,*.test.tsx,*.test.js,*.test.jsx` | `npx jest --reporters={reporter} -- {files}`           | `src/`      |
 
 If no `.lazytest.yml` is found, LazyTest walks up to 3 directory levels to auto-detect `phpunit.xml`, `vitest.config.{ts,mts,js}`, and `jest.config.{ts,js,mjs,cjs}`.
 
@@ -247,7 +247,7 @@ targets:
 ```yaml
 targets:
   - name: jest
-    command: "npx jest --reporters={reporter} {files}"
+    command: "npx jest --reporters={reporter} -- {files}"
 ```
 
 **pytest** with [teamcity-messages](https://pypi.org/project/teamcity-messages/):

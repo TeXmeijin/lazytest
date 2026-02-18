@@ -214,7 +214,7 @@ func TestTargetApplyDefaultsJest(t *testing.T) {
 	if target.FilePattern != "*.test.ts,*.test.tsx,*.test.js,*.test.jsx" {
 		t.Errorf("FilePattern = %q", target.FilePattern)
 	}
-	if target.Command != "npx jest --reporters={reporter} {files}" {
+	if target.Command != "npx jest --reporters={reporter} -- {files}" {
 		t.Errorf("Command = %q", target.Command)
 	}
 	if len(target.TestDirs) != 1 || target.TestDirs[0] != "src/" {
@@ -246,7 +246,7 @@ func TestLoadJestDefaults(t *testing.T) {
 	if jt.FilePattern != "*.test.ts,*.test.tsx,*.test.js,*.test.jsx" {
 		t.Errorf("FilePattern default = %q", jt.FilePattern)
 	}
-	if jt.Command != "npx jest --reporters={reporter} {files}" {
+	if jt.Command != "npx jest --reporters={reporter} -- {files}" {
 		t.Errorf("Command default = %q", jt.Command)
 	}
 	if len(jt.TestDirs) != 1 || jt.TestDirs[0] != "src/" {

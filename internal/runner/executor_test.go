@@ -104,7 +104,7 @@ func TestBuildCommandVitest(t *testing.T) {
 func TestBuildCommandJest(t *testing.T) {
 	e := NewExecutor(config.Config{
 		Targets: []config.Target{
-			{Name: "jest", Command: "npx jest --reporters={reporter} {files}"},
+			{Name: "jest", Command: "npx jest --reporters={reporter} -- {files}"},
 		},
 	})
 

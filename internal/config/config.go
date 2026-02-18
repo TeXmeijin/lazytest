@@ -81,7 +81,7 @@ func (t *Target) applyDefaults() {
 			t.FilePattern = "*.test.ts,*.test.tsx,*.test.js,*.test.jsx"
 		}
 		if t.Command == "" {
-			t.Command = "npx jest --reporters={reporter} {files}"
+			t.Command = "npx jest --reporters={reporter} -- {files}"
 		}
 		if len(t.TestDirs) == 0 {
 			t.TestDirs = []string{"src/"}
