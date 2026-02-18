@@ -7,6 +7,7 @@ import (
 	"github.com/charmbracelet/bubbles/key"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/charmbracelet/x/ansi"
 	"github.com/meijin/lazytest/internal/domain"
 )
 
@@ -125,6 +126,8 @@ func (m ResultsModel) Update(msg tea.Msg) (ResultsModel, tea.Cmd) {
 		case key.Matches(msg, resultsKeys.Filter):
 			m.filterFails = !m.filterFails
 			m.cursor = 0
+			m.scrollY = 0
+			m.focusDetail = false
 			m.buildFlatList()
 		}
 	}
@@ -223,7 +226,7 @@ func (m ResultsModel) renderTreeView(width, height int) string {
 			}
 		}
 
-		lines = append(lines, line)
+		lines = append(lines, ansi.Truncate(line, width, ""))
 	}
 
 	for len(lines) < height {
@@ -371,6 +374,11 @@ func (m ResultsModel) renderDetailView(width, height int) string {
 				lines = append(lines, detailBodyStyle.Render("  "+tc.Message))
 			}
 		}
+	}
+
+	// Truncate lines to fit within width to prevent lipgloss word-wrapping
+	for i := range lines {
+		lines[i] = ansi.Truncate(lines[i], width, "")
 	}
 
 	// Apply scroll

@@ -257,16 +257,12 @@ func (a *App) startTests(files []domain.TestFile) tea.Cmd {
 
 func waitForEvent(runID uint64, events <-chan *runner.TargetEvent, errs <-chan error) tea.Cmd {
 	return func() tea.Msg {
-		select {
-		case ev, ok := <-events:
-			if !ok {
-				err := <-errs
-				return testDoneMsg{runID: runID, err: err}
-			}
-			return testEventMsg{runID: runID, event: ev, events: events, errs: errs}
-		case err := <-errs:
+		ev, ok := <-events
+		if !ok {
+			err := <-errs
 			return testDoneMsg{runID: runID, err: err}
 		}
+		return testEventMsg{runID: runID, event: ev, events: events, errs: errs}
 	}
 }
 
@@ -287,11 +283,6 @@ func (a *App) resolveSelectedFile() string {
 		return ""
 	}
 
-	suite := a.results.SelectedSuite()
-	if suite == nil {
-		return ""
-	}
-
 	targetName := item.targetName
 
 	// Collect files for this target
@@ -302,38 +293,63 @@ func (a *App) resolveSelectedFile() string {
 		}
 	}
 
-	// Try to match suite name to file path
-	suitePath := strings.ReplaceAll(suite.Name, `\`, "/")
-	suitePath = strings.ToLower(suitePath)
-
-	for _, f := range targetFiles {
-		normalized := strings.ToLower(f.Path)
-		ext := filepath.Ext(normalized)
-		withoutExt := strings.TrimSuffix(normalized, ext)
-		if strings.HasSuffix(withoutExt, suitePath) {
-			return f.Path
-		}
+	if len(targetFiles) == 0 {
+		return ""
 	}
 
-	// Try partial match on just the class/module name (last segment)
-	parts := strings.Split(suitePath, "/")
-	className := parts[len(parts)-1]
-	for _, f := range targetFiles {
-		normalized := strings.ToLower(f.Path)
-		ext := filepath.Ext(normalized)
-		withoutExt := strings.TrimSuffix(normalized, ext)
-		segments := strings.Split(withoutExt, "/")
-		if segments[len(segments)-1] == className {
-			return f.Path
-		}
-	}
-
-	// If only one file was tested for this target, return it
+	// If only one file was tested for this target, always return it
 	if len(targetFiles) == 1 {
 		return targetFiles[0].Path
 	}
 
-	return ""
+	suite := a.results.SelectedSuite()
+	if suite == nil {
+		return targetFiles[0].Path
+	}
+
+	suiteName := strings.ReplaceAll(suite.Name, `\`, "/")
+	suiteNameLower := strings.ToLower(suiteName)
+
+	// Strategy 1: File path contains suite name (handles working_dir prefix)
+	for _, f := range targetFiles {
+		if strings.Contains(strings.ToLower(f.Path), suiteNameLower) {
+			return f.Path
+		}
+	}
+
+	// Strategy 2: Extension-insensitive suffix match
+	suiteNoExt := stripExtensions(suiteNameLower)
+	for _, f := range targetFiles {
+		fNoExt := stripExtensions(strings.ToLower(f.Path))
+		if strings.HasSuffix(fNoExt, suiteNoExt) {
+			return f.Path
+		}
+	}
+
+	// Strategy 3: Partial match on last segment
+	parts := strings.Split(suiteNameLower, "/")
+	className := stripExtensions(parts[len(parts)-1])
+	for _, f := range targetFiles {
+		fLower := strings.ToLower(f.Path)
+		segments := strings.Split(fLower, "/")
+		lastSeg := stripExtensions(segments[len(segments)-1])
+		if lastSeg == className {
+			return f.Path
+		}
+	}
+
+	return targetFiles[0].Path
+}
+
+// stripExtensions removes file extensions (e.g. ".test.php" → "", "ExampleTest.php" → "ExampleTest").
+func stripExtensions(name string) string {
+	for {
+		ext := filepath.Ext(name)
+		if ext == "" {
+			return name
+		}
+		name = strings.TrimSuffix(name, ext)
+	}
 }
 
 func openFileCmd(filePath string) tea.Cmd {
