@@ -1,54 +1,84 @@
 # LazyTest
 
-A TUI test runner for **monorepos**, built with Go and [Bubble Tea](https://github.com/charmbracelet/bubbletea).
+**The terminal test runner that actually understands your monorepo.**
 
-LazyTest parses [TeamCity format](https://www.jetbrains.com/help/teamcity/service-messages.html#Reporting+Tests) output in real time and displays results interactively in your terminal. Run PHPUnit, Vitest, Jest, pytest and more — side by side from a single TUI.
+PHPUnit and Vitest in the same project? Backend tests behind Docker, frontend tests on bare metal? Different working directories, different file patterns, different everything? LazyTest handles all of it from a single TUI — no tab-switching, no re-running scripts, no context-switching between frameworks.
 
 ![LazyTest Demo](demo.gif)
+
+---
+
+**fzf-style fuzzy search** across 1,000+ test files. **Tab multi-select** to pick exactly what you want to run. **Real-time streaming** so you see results the instant they happen, not after the whole suite finishes. **Parallel execution** of multiple frameworks simultaneously. **Zero-config auto-detection** that just works when you drop into a directory.
+
+Built with Go and [Bubble Tea](https://github.com/charmbracelet/bubbletea). Single binary, no runtime dependencies.
+
+---
+
+## Why LazyTest?
+
+Most test runners are built for one framework. In a monorepo you end up with a patchwork of shell scripts, Makefile targets, and muscle memory. "Was it `make test-php` or `npm run test`? Which directory am I in?"
+
+LazyTest replaces that with one command:
+
+```bash
+lazytest
+```
+
+It scans your project, detects frameworks, and presents every test file in a searchable, selectable list — tagged with `[PHP]`, `[VT]`, or whatever your targets are. Pick files across different frameworks, hit Enter, and watch them run in parallel with live-updating results.
+
+### What Sets It Apart
+
+| | LazyTest | Typical CLI runner |
+|-|----------|--------------------|
+| **Monorepo** | First-class. Multiple targets with separate commands, dirs, and patterns. | One framework at a time. |
+| **File selection** | fzf-like fuzzy search + Tab multi-select across all targets. | Glob patterns or "run everything". |
+| **Feedback loop** | Streaming — see each test result as it finishes. | Wait for the entire run, then scroll. |
+| **Setup** | Auto-detects `phpunit.xml` and `vitest.config.*`. Zero config to start. | Config per framework. |
+| **Cross-framework** | PHPUnit + Vitest + Jest + pytest + anything with TeamCity/TAP output. | Framework-specific. |
 
 ## Features
 
 ### Fuzzy File Search
 
-fzf-inspired two-phase fuzzy search. Type a few characters and LazyTest finds your test files — contiguous substring matches are ranked first, followed by subsequence matches with smart scoring. Matched characters are highlighted in amber so you can see exactly what's matching.
+fzf-inspired two-phase fuzzy matching. Type a few characters and LazyTest finds your test files instantly — contiguous substring matches are ranked first, followed by subsequence matches with smart scoring. Matched characters are highlighted so you can see exactly what's matching.
 
-The algorithm uses a backward pass to find the tightest match window, bonuses for word-boundary hits (`/`, `_`, `-`, `.`), and a hard span cutoff to eliminate scattered noise.
+The algorithm uses a backward pass to find the tightest match window, bonuses for word-boundary hits (`/`, `_`, `-`, `.`), and a span cutoff to eliminate scattered noise. Queries of 3+ characters require at least one consecutive character pair, so `tutor` matches `TutorAgent` but not `tests/Unit/Bookmark`.
 
 ### Multi-Select
 
-Select individual files with `Tab`, or batch-select with `Ctrl+A`. Selected files are marked with `◆` and the header shows the count. Press `Enter` to run only the selected files — or just press `Enter` without selecting anything to run the file under your cursor.
+Select individual files with `Tab` (cursor advances automatically, just like fzf), or batch-select with `Ctrl+A`. Selected files are marked with `◆` and the header shows the count. Press `Enter` to run only the selected files — or just hit `Enter` with no selection to run the file under your cursor.
 
-### Multi-Framework / Monorepo Support
+### Multi-Framework Parallel Execution
 
-Configure multiple test targets in a single `.lazytest.yml`. Each target can have its own command, working directory, file patterns, and path transformations. LazyTest groups files by target and executes them in parallel using goroutines with fan-in event streaming.
+Each target runs in its own goroutine. LazyTest groups selected files by target, spawns parallel processes, and merges their event streams into a single UI via fan-in. A PHPUnit suite running in Docker and a Vitest suite running locally execute simultaneously — and you see both updating in real time.
 
-### Auto-Detection
+### Zero-Config Auto-Detection
 
-Drop into a directory and run `lazytest` with no config. LazyTest walks up to 3 directory levels looking for `phpunit.xml` / `phpunit.xml.dist` and `vitest.config.{ts,mts,js}`, then builds targets automatically with sensible defaults. Nested monorepo structures are handled — each detected project becomes its own target.
+Run `lazytest` with no config file. It walks up to 3 directory levels looking for `phpunit.xml`, `phpunit.xml.dist`, and `vitest.config.{ts,mts,js}`, then builds targets with sensible defaults. Nested monorepo structures are handled — each detected project becomes its own target with the correct working directory.
 
-### Real-Time Streaming
+### Real-Time Streaming Results
 
-Test results appear as they execute. Each target shows a live tree of suites and test cases with status icons (`◉` running, `✓` passed, `✗` failed, `⊘` skipped) and durations. No waiting for the full run to finish.
+No staring at a frozen terminal. Test results appear as they execute — each target shows a live tree of suites and test cases with status icons (`◉` running, `✓` passed, `✗` failed, `⊘` skipped) and durations. The moment one test finishes, you see it.
 
-### Split-Pane Results
+### Split-Pane Results View
 
-Results mode shows a two-pane layout: suite/test tree on the left (45%), detailed information on the right (55%). Navigate with vim keys, drill into failures to see messages and stack traces, or press `f` to filter to failures only.
+After execution, results mode shows a two-pane layout: suite/test tree on the left, detailed information on the right. Navigate with vim keys (`h`/`j`/`k`/`l`), drill into failures to see messages and full stack traces, or press `f` to filter to failures only.
 
 ### Target Badges
 
-`[PHP]` and `[VT]` badges (and custom badges for other targets) appear next to every file and result, so you always know which framework you're looking at.
+`[PHP]` and `[VT]` badges (and custom badges for any target name) appear next to every file and result entry, so you always know which framework you're looking at — even when files from different targets are interleaved.
 
 ### Built-in Vitest Reporter
 
-A TeamCity-compatible Vitest reporter is embedded in the binary via `go:embed`. No need to install `vitest-teamcity-reporter` separately — LazyTest writes it to a temp file and injects the path via the `{reporter}` template variable.
+A TeamCity-compatible Vitest reporter is embedded in the binary via `go:embed`. No need to `npm install` a separate reporter package — LazyTest extracts it to a temp file and injects the path through the `{reporter}` template variable.
 
 ### Editor Integration
 
-Press `o` in results mode to open the relevant test file in your OS default application (uses `open` on macOS, `xdg-open` on Linux, `start` on Windows).
+Press `o` in results mode to open the relevant test file in your OS default application (`open` on macOS, `xdg-open` on Linux, `start` on Windows).
 
 ### TeamCity + TAP Parsing
 
-The streaming parser auto-detects the output format. TeamCity service messages are the primary format, with TAP v13 as a fallback. Both formats support real-time line-by-line parsing with proper escape handling.
+The streaming parser auto-detects the output format on the first meaningful line. TeamCity service messages are the primary format, with TAP v13 as a fallback. Any test runner that speaks either protocol works with LazyTest.
 
 ## Install
 
