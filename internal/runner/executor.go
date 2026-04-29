@@ -22,8 +22,9 @@ type TargetEvent struct {
 
 // Executor manages test command execution across multiple targets.
 type Executor struct {
-	Targets      map[string]config.Target
-	reporterPath string
+	Targets            map[string]config.Target
+	vitestReporterPath string
+	jestReporterPath   string
 }
 
 // NewExecutor creates a new Executor with the given config.
@@ -32,8 +33,9 @@ func NewExecutor(cfg config.Config) *Executor {
 	for _, t := range cfg.Targets {
 		targets[t.Name] = t
 	}
-	reporterPath, _ := reporter.EnsureVitestReporter()
-	return &Executor{Targets: targets, reporterPath: reporterPath}
+	vitestReporterPath, _ := reporter.EnsureVitestReporter()
+	jestReporterPath, _ := reporter.EnsureJestReporter()
+	return &Executor{Targets: targets, vitestReporterPath: vitestReporterPath, jestReporterPath: jestReporterPath}
 }
 
 // BuildCommand constructs the full command string for a specific target.
@@ -63,7 +65,11 @@ func (e *Executor) BuildCommand(targetName string, files []string) string {
 		cmd = strings.ReplaceAll(cmd, "{file}", transformed[0])
 	}
 
-	cmd = strings.ReplaceAll(cmd, "{reporter}", e.reporterPath)
+	reporterPath := e.vitestReporterPath
+	if target.Name == "jest" {
+		reporterPath = e.jestReporterPath
+	}
+	cmd = strings.ReplaceAll(cmd, "{reporter}", reporterPath)
 
 	return cmd
 }

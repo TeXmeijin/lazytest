@@ -76,6 +76,16 @@ func (t *Target) applyDefaults() {
 		if len(t.TestDirs) == 0 {
 			t.TestDirs = []string{"src/"}
 		}
+	case "jest":
+		if t.FilePattern == "" {
+			t.FilePattern = "*.test.ts,*.test.tsx,*.test.js,*.test.jsx"
+		}
+		if t.Command == "" {
+			t.Command = "npx jest --reporters={reporter} {files}"
+		}
+		if len(t.TestDirs) == 0 {
+			t.TestDirs = []string{"src/"}
+		}
 	default: // phpunit and others
 		if t.FilePattern == "" {
 			t.FilePattern = "*Test.php"
@@ -110,6 +120,12 @@ func FindProjectRoot(dir string) (string, error) {
 		}
 		// Check for vitest config files
 		for _, name := range []string{"vitest.config.ts", "vitest.config.mts", "vitest.config.js"} {
+			if _, err := os.Stat(filepath.Join(dir, name)); err == nil {
+				return dir, nil
+			}
+		}
+		// Check for jest config files
+		for _, name := range []string{"jest.config.ts", "jest.config.js", "jest.config.mjs", "jest.config.cjs"} {
 			if _, err := os.Stat(filepath.Join(dir, name)); err == nil {
 				return dir, nil
 			}

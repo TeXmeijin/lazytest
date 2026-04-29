@@ -33,7 +33,7 @@ It scans your project, detects frameworks, and presents every test file in a sea
 | **Monorepo** | First-class. Multiple targets with separate commands, dirs, and patterns. | One framework at a time. |
 | **File selection** | fzf-like fuzzy search + Tab multi-select across all targets. | Glob patterns or "run everything". |
 | **Feedback loop** | Streaming — see each test result as it finishes. | Wait for the entire run, then scroll. |
-| **Setup** | Auto-detects `phpunit.xml` and `vitest.config.*`. Zero config to start. | Config per framework. |
+| **Setup** | Auto-detects `phpunit.xml`, `vitest.config.*`, and `jest.config.*`. Zero config to start. | Config per framework. |
 | **Cross-framework** | PHPUnit + Vitest + Jest + pytest + anything with TeamCity/TAP output. | Framework-specific. |
 
 ## Features
@@ -54,7 +54,7 @@ Each target runs in its own goroutine. LazyTest groups selected files by target,
 
 ### Zero-Config Auto-Detection
 
-Run `lazytest` with no config file. It walks up to 3 directory levels looking for `phpunit.xml`, `phpunit.xml.dist`, and `vitest.config.{ts,mts,js}`, then builds targets with sensible defaults. Nested monorepo structures are handled — each detected project becomes its own target with the correct working directory.
+Run `lazytest` with no config file. It walks up to 3 directory levels looking for `phpunit.xml`, `phpunit.xml.dist`, `vitest.config.{ts,mts,js}`, and `jest.config.{ts,js,mjs,cjs}`, then builds targets with sensible defaults. Nested monorepo structures are handled — each detected project becomes its own target with the correct working directory.
 
 ### Real-Time Streaming Results
 
@@ -68,9 +68,9 @@ After execution, results mode shows a two-pane layout: suite/test tree on the le
 
 `[PHP]` and `[VT]` badges (and custom badges for any target name) appear next to every file and result entry, so you always know which framework you're looking at — even when files from different targets are interleaved.
 
-### Built-in Vitest Reporter
+### Built-in Vitest & Jest Reporters
 
-A TeamCity-compatible Vitest reporter is embedded in the binary via `go:embed`. No need to `npm install` a separate reporter package — LazyTest extracts it to a temp file and injects the path through the `{reporter}` template variable.
+TeamCity-compatible reporters for Vitest and Jest are embedded in the binary via `go:embed`. No need to `npm install` separate reporter packages — LazyTest extracts them to temp files and injects the path through the `{reporter}` template variable.
 
 ### Editor Integration
 
@@ -166,12 +166,13 @@ targets:
 
 When a field is omitted, defaults are applied based on the target name:
 
-| Target    | `file_pattern`         | `command`                                              | `test_dirs` |
-|-----------|------------------------|--------------------------------------------------------|-------------|
-| `phpunit` | `*Test.php`            | `./vendor/bin/phpunit --teamcity {files}`              | `tests/`    |
-| `vitest`  | `*.test.ts,*.test.tsx` | `npx vitest run --reporter={reporter} {files}`         | `src/`      |
+| Target    | `file_pattern`                          | `command`                                              | `test_dirs` |
+|-----------|------------------------------------------|--------------------------------------------------------|-------------|
+| `phpunit` | `*Test.php`                              | `./vendor/bin/phpunit --teamcity {files}`              | `tests/`    |
+| `vitest`  | `*.test.ts,*.test.tsx`                   | `npx vitest run --reporter={reporter} {files}`         | `src/`      |
+| `jest`    | `*.test.ts,*.test.tsx,*.test.js,*.test.jsx` | `npx jest --reporters={reporter} {files}`           | `src/`      |
 
-If no `.lazytest.yml` is found, LazyTest walks up to 3 directory levels to auto-detect `phpunit.xml` and `vitest.config.{ts,mts,js}`.
+If no `.lazytest.yml` is found, LazyTest walks up to 3 directory levels to auto-detect `phpunit.xml`, `vitest.config.{ts,mts,js}`, and `jest.config.{ts,js,mjs,cjs}`.
 
 ## Key Bindings
 
@@ -242,12 +243,11 @@ targets:
     file_pattern: "*Test.php"
 ```
 
-**Jest** with [jest-teamcity](https://www.npmjs.com/package/jest-teamcity):
+**Jest** — uses the built-in reporter (no extra install needed):
 ```yaml
 targets:
   - name: jest
-    command: "npx jest --reporters=jest-teamcity {files}"
-    file_pattern: "*.test.ts"
+    command: "npx jest --reporters={reporter} {files}"
 ```
 
 **pytest** with [teamcity-messages](https://pypi.org/project/teamcity-messages/):
