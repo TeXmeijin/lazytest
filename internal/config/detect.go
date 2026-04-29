@@ -33,6 +33,11 @@ func DetectFrameworks(root string) ([]Target, error) {
 		targets = append(targets, t)
 	}
 
+	// Check root level for rspec
+	if t, found := detectRSpecTarget(root, ""); found {
+		targets = append(targets, t)
+	}
+
 	// Walk up to 3 levels deep for nested projects
 	err := walkLimited(root, 3, func(dir, rel string) {
 		if t, found := detectPHPUnitTarget(dir, rel); found {
@@ -48,6 +53,11 @@ func DetectFrameworks(root string) ([]Target, error) {
 		}
 		if t, found := detectJestTarget(dir, rel); found {
 			if !hasTarget(targets, "jest", dir) {
+				targets = append(targets, t)
+			}
+		}
+		if t, found := detectRSpecTarget(dir, rel); found {
+			if !hasTarget(targets, "rspec", dir) {
 				targets = append(targets, t)
 			}
 		}
@@ -191,6 +201,30 @@ func detectJestTarget(dir, relFromRoot string) (Target, bool) {
 	if relFromRoot != "" {
 		t.WorkingDir = relFromRoot + "/"
 		t.TestDirs = []string{relFromRoot + "/src/"}
+	}
+	t.applyDefaults()
+	return t, true
+}
+
+// detectRSpecTarget checks if dir contains .rspec or Gemfile.
+func detectRSpecTarget(dir, relFromRoot string) (Target, bool) {
+	found := false
+	for _, name := range []string{".rspec", "Gemfile"} {
+		if _, err := os.Stat(filepath.Join(dir, name)); err == nil {
+			found = true
+			break
+		}
+	}
+	if !found {
+		return Target{}, false
+	}
+
+	t := Target{
+		Name: "rspec",
+	}
+	if relFromRoot != "" {
+		t.WorkingDir = relFromRoot + "/"
+		t.TestDirs = []string{relFromRoot + "/spec/"}
 	}
 	t.applyDefaults()
 	return t, true

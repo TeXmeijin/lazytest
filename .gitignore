@@ -16,3 +16,9 @@
 .vscode/
 *.swp
 *.swo
+
+# Claude Code ローカル設定
+.claude/settings.local.json
+
+# Claude Code ローカル設定
+.claude/settings.local.json

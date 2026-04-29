@@ -86,6 +86,16 @@ func (t *Target) applyDefaults() {
 		if len(t.TestDirs) == 0 {
 			t.TestDirs = []string{"src/"}
 		}
+	case "rspec":
+		if t.FilePattern == "" {
+			t.FilePattern = "*_spec.rb"
+		}
+		if t.Command == "" {
+			t.Command = "bundle exec rspec --require {reporter} --format LazyTestTeamCityFormatter {files}"
+		}
+		if len(t.TestDirs) == 0 {
+			t.TestDirs = []string{"spec/"}
+		}
 	default: // phpunit and others
 		if t.FilePattern == "" {
 			t.FilePattern = "*Test.php"
@@ -126,6 +136,12 @@ func FindProjectRoot(dir string) (string, error) {
 		}
 		// Check for jest config files
 		for _, name := range []string{"jest.config.ts", "jest.config.js", "jest.config.mjs", "jest.config.cjs"} {
+			if _, err := os.Stat(filepath.Join(dir, name)); err == nil {
+				return dir, nil
+			}
+		}
+		// Check for rspec config files
+		for _, name := range []string{".rspec", "Gemfile"} {
 			if _, err := os.Stat(filepath.Join(dir, name)); err == nil {
 				return dir, nil
 			}

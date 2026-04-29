@@ -12,6 +12,9 @@ var vitestReporterJS []byte
 //go:embed jest-reporter.js
 var jestReporterJS []byte
 
+//go:embed rspec-formatter.rb
+var rspecFormatterRB []byte
+
 // EnsureVitestReporter writes the embedded Vitest reporter to a temp file
 // and returns its path. The file is overwritten on each call to ensure
 // it matches the current binary version.
@@ -26,4 +29,12 @@ func EnsureVitestReporter() (string, error) {
 func EnsureJestReporter() (string, error) {
 	path := filepath.Join(os.TempDir(), "lazytest-jest-reporter.js")
 	return path, os.WriteFile(path, jestReporterJS, 0644)
+}
+
+// EnsureRSpecReporter writes the embedded RSpec formatter to a temp file
+// and returns its path. The file is overwritten on each call to ensure
+// it matches the current binary version.
+func EnsureRSpecReporter() (string, error) {
+	path := filepath.Join(os.TempDir(), "lazytest-rspec-formatter.rb")
+	return path, os.WriteFile(path, rspecFormatterRB, 0644)
 }

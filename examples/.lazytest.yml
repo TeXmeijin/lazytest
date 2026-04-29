@@ -12,3 +12,10 @@ targets:
       - frontend/src/
     file_pattern: "*.test.ts"
     working_dir: "frontend/"
+
+  - name: jest
+    command: "npx jest --reporters={reporter} -- {files}"
+    test_dirs:
+      - jest/src/
+    file_pattern: "*.test.ts"
+    working_dir: "jest/"

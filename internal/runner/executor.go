@@ -25,6 +25,7 @@ type Executor struct {
 	Targets            map[string]config.Target
 	vitestReporterPath string
 	jestReporterPath   string
+	rspecReporterPath  string
 }
 
 // NewExecutor creates a new Executor with the given config.
@@ -35,7 +36,8 @@ func NewExecutor(cfg config.Config) *Executor {
 	}
 	vitestReporterPath, _ := reporter.EnsureVitestReporter()
 	jestReporterPath, _ := reporter.EnsureJestReporter()
-	return &Executor{Targets: targets, vitestReporterPath: vitestReporterPath, jestReporterPath: jestReporterPath}
+	rspecReporterPath, _ := reporter.EnsureRSpecReporter()
+	return &Executor{Targets: targets, vitestReporterPath: vitestReporterPath, jestReporterPath: jestReporterPath, rspecReporterPath: rspecReporterPath}
 }
 
 // BuildCommand constructs the full command string for a specific target.
@@ -66,8 +68,11 @@ func (e *Executor) BuildCommand(targetName string, files []string) string {
 	}
 
 	reporterPath := e.vitestReporterPath
-	if target.Name == "jest" {
+	switch target.Name {
+	case "jest":
 		reporterPath = e.jestReporterPath
+	case "rspec":
+		reporterPath = e.rspecReporterPath
 	}
 	cmd = strings.ReplaceAll(cmd, "{reporter}", reporterPath)
 
